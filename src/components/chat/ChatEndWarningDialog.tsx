@@ -6,7 +6,7 @@ import { Dialog } from '@/components/dialog/Dialog';
 interface ChatEndWarningDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (isChecked: boolean) => void;
 }
 
 export const ChatEndWarningDialog = ({
@@ -16,16 +16,11 @@ export const ChatEndWarningDialog = ({
 }: ChatEndWarningDialogProps) => {
   const [isChecked, setIsChecked] = useState(false);
 
-  const handleConfirm = () => {
-    // TODO: 체크박스 체크 여부에 따라 처리
-    onConfirm();
-  };
-
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
-      onConfirm={handleConfirm}
+      onConfirm={() => onConfirm(isChecked)}
       title='채팅을 종료 하시겠습니까?'
       description={`이코의의 채팅을 종료할 시 기록이 저장되지\n않습니다. 나가시겠습니까?`}
       content={
