@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CHARACTER_DATA } from '@/constants/CharacterInfo';
+import type { CharacterItem } from '@/types/CharacterInfoTypes';
 
 interface Particle {
   id: number;
@@ -21,15 +22,14 @@ interface Confetti {
 }
 
 interface CelebrationEffectProps {
-  characterName: string;
+  character?: CharacterItem;
   onComplete: () => void;
 }
 
 export const CelebrationEffect = ({
-  characterName,
+  character = CHARACTER_DATA['eco'],
   onComplete,
 }: CelebrationEffectProps) => {
-  console.log('@@@onComplete', onComplete);
   useEffect(() => {
     const timer = setTimeout(() => {
       // 3초 후 자동으로 사라지게
@@ -89,9 +89,9 @@ export const CelebrationEffect = ({
           }}
         >
           <img
-            alt={CHARACTER_DATA[characterName].characterName}
+            alt={character.characterName}
             className='h-auto w-full object-contain'
-            src={CHARACTER_DATA[characterName].characterImage}
+            src={character.characterImage}
           />
         </motion.div>
       </motion.div>
