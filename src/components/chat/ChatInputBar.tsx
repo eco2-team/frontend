@@ -122,7 +122,7 @@ const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
         <div className='flex justify-start'>
           <div className='relative'>
             <img
-              src={imageFile ? URL.createObjectURL(imageFile) : undefined}
+              src={URL.createObjectURL(imageFile)}
               alt='preview'
               className='h-20 w-20 rounded-md border object-cover'
             />
