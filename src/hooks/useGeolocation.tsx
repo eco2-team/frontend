@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_CENTER } from '@/constants/MapConfig';
 import type { Position } from '@/types/MapTypes';
+import useKakaoLoaderOrigin from './useKakaoLoaderOrigin';
 
 interface GeolocationError {
   code: number;
@@ -8,10 +9,11 @@ interface GeolocationError {
 }
 
 interface UseGeolocationReturn {
-  position: Position | null;
+  center: Position;
+  setCenter: (center: Position) => void;
+  userLocation: Position | null;
   error: string | null;
   isLoading: boolean;
-  tempPositions: Position[];
 }
 
 /**
@@ -19,9 +21,12 @@ interface UseGeolocationReturn {
  * @returns {UseGeolocationReturn} position, error, isLoading 상태
  */
 export const useGeolocation = (): UseGeolocationReturn => {
-  const [position, setPosition] = useState<Position>(DEFAULT_CENTER);
+  const [center, setCenter] = useState<Position>(DEFAULT_CENTER);
+  const [userLocation, setUserLocation] = useState<Position | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useKakaoLoaderOrigin();
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -33,11 +38,13 @@ export const useGeolocation = (): UseGeolocationReturn => {
     console.log('🔍 위치 정보 요청 중...');
 
     const handleSuccess = (pos: GeolocationPosition) => {
-      setPosition({
-        id: 0,
+      const location = {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
-      });
+      };
+
+      setUserLocation(location);
+      setCenter(location);
 
       setError(null);
       setIsLoading(false);
@@ -73,28 +80,5 @@ export const useGeolocation = (): UseGeolocationReturn => {
     });
   }, []);
 
-  const tempPositions = [
-    {
-      id: 1,
-      lat: position.lat + 0.00055,
-      lng: position.lng,
-    },
-    {
-      id: 2,
-      lat: position.lat,
-      lng: position.lng + 0.00055,
-    },
-    {
-      id: 3,
-      lat: position.lat - 0.00055,
-      lng: position.lng - 0.00055,
-    },
-    {
-      id: 4,
-      lat: position.lat - 0.00055,
-      lng: position.lng + 0.00055,
-    },
-  ];
-
-  return { position, error, isLoading, tempPositions };
+  return { center, setCenter, userLocation, error, isLoading };
 };

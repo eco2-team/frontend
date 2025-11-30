@@ -2,7 +2,6 @@ import type { Position } from '@/types/MapTypes';
 
 // 기본 지도 중심 좌표 (동대문 디자인 플라자 DDP)
 export const DEFAULT_CENTER: Position = {
-  id: 0,
   lat: 37.567976,
   lng: 127.009341,
 } as const;

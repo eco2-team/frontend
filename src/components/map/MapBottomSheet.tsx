@@ -1,8 +1,10 @@
+import type { LocationListResponse } from '@/api/services/map/map.type';
 import { BottomSheet } from '@/components/bottomSheet/BottomSheet';
-import { MapCardList } from './MapCardList';
-import { EcoHelperCard } from './EcoHelperCard';
+import { EcoHelperCard } from '@/components/map/EcoHelperCard';
+import { MapCardList } from '@/components/map/MapCardList';
 
 interface MapBottomSheetProps {
+  data: LocationListResponse;
   selectedId: number | null;
   setSelectedId: (id: number | null) => void;
 }
@@ -18,9 +20,10 @@ const header = (
   </div>
 );
 
-const children = ({ selectedId, setSelectedId }: MapBottomSheetProps) => (
+const children = ({ data, selectedId, setSelectedId }: MapBottomSheetProps) => (
   <>
     <MapCardList
+      data={data}
       selectLocationId={selectedId}
       setSelectLocationId={setSelectedId}
     />
@@ -29,12 +32,22 @@ const children = ({ selectedId, setSelectedId }: MapBottomSheetProps) => (
 );
 
 export const MapBottomSheet = ({
+  data,
   selectedId,
   setSelectedId,
 }: MapBottomSheetProps) => {
+  const handleResetSelectedId = () => {
+    setSelectedId(null);
+  };
+
   return (
-    <BottomSheet isOpen header={header} onClick={() => setSelectedId(null)}>
-      {children({ selectedId, setSelectedId })}
+    <BottomSheet
+      isOpen
+      isFullScreen
+      header={header}
+      onClick={handleResetSelectedId}
+    >
+      {children({ data, selectedId, setSelectedId })}
     </BottomSheet>
   );
 };
