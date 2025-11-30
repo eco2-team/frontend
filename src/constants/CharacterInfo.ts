@@ -28,8 +28,7 @@ import Vinyl from '@/assets/icons/icon_vinyl.svg';
 import type { CharacterDataMap } from '@/types/CharacterInfoTypes';
 
 export const CHARACTER_DATA: CharacterDataMap = {
-  eco: {
-    id: 'eco',
+  이코: {
     characterType: 'main',
     wasteName: '이코',
     characterName: '이코',
@@ -37,8 +36,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: EcoCharacter,
     description: '환경을 사랑하는 AI 분리배출 도우미',
   },
-  paper: {
-    id: 'paper',
+  페이피: {
     characterType: 'sub',
     wasteName: '종이',
     characterName: '페이피',
@@ -46,8 +44,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: PaperCharacter,
     description: '테이프와 스테이플은 떼고 깨끗하게 접어요!',
   },
-  paperProduct: {
-    id: 'paperProduct',
+  팩토리: {
     characterType: 'sub',
     wasteName: '종이팩',
     characterName: '팩토리',
@@ -55,8 +52,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: PaperProductsCharacter,
     description: '물로 헹구고 라벨을 제거하는 멋진 팩토리!',
   },
-  pet: {
-    id: 'pet',
+  페티: {
     characterType: 'sub',
     wasteName: '무색페트병',
     characterName: '페티',
@@ -64,9 +60,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: PetCharacter,
     description: '라벨과 뚜껑을 분리하고 투명하게 헹궈줘요!',
   },
-
-  vinyl: {
-    id: 'vinyl',
+  비니: {
     characterType: 'sub',
     wasteName: '비닐류',
     characterName: '비니',
@@ -74,8 +68,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: VinylCharacter,
     description: '이물질과 내용물을 제거하고 모아서 배출해!',
   },
-  glass: {
-    id: 'glass',
+  글래시: {
     characterType: 'sub',
     wasteName: '유리병',
     characterName: '글래시',
@@ -83,8 +76,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: GlassCharacter,
     description: '라벨과 뚜껑을 제거하고 색 별로 구분해 배출해요!',
   },
-  clothes: {
-    id: 'clothes',
+  코튼: {
     characterType: 'sub',
     wasteName: '의류·원단',
     characterName: '코튼',
@@ -92,56 +84,50 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterImage: ClothesCharacter,
     description: '젖지 않게 모아서 수거함에 넣어봐요!',
   },
-  plastic: {
-    id: 'plastic',
+  플리: {
     characterType: 'sub',
     wasteName: '플라스틱류',
-    characterName: '폴리',
+    characterName: '플리',
     wasteImage: Plastic,
     characterImage: PlasticCharacter,
     description: '세척 후 잘 말리고 압착해서 버려요!',
   },
-  metal: {
-    id: 'metal',
+  메탈리: {
     characterType: 'sub',
     wasteName: '금속류',
-    characterName: '메탈린',
+    characterName: '메탈리',
     wasteImage: Metal,
     characterImage: MetalCharacter,
     description: '음식물을 깨끗히 제거 후 분리배출해봐!',
   },
-  battery: {
-    id: 'battery',
+  배리: {
     characterType: 'sub',
     wasteName: '전지',
-    characterName: '배터리',
+    characterName: '배리',
     wasteImage: Battery,
     characterImage: BatteryCharacter,
     description: '본체와 분리해서 전용 수거함에 버려요!',
   },
-  lighting: {
-    id: 'lighting',
+  라이티: {
     characterType: 'sub',
     wasteName: '조명제품',
-    characterName: '라이터',
+    characterName: '라이티',
     wasteImage: Lighting,
     characterImage: LightingCharacter,
     description: '형광등은 깨지지 않게 포장해서 전용수거함으로!',
   },
-  monitor: {
-    id: 'monitor',
+  일렉: {
     characterType: 'sub',
     wasteName: '전기전자',
-    characterName: '웰리',
+    characterName: '일렉',
     wasteImage: Monitor,
     characterImage: MonitorCharacter,
     description: '그냥은 안돼! 전자제품은 가까운 수거센터로!',
   },
-  styrofoam: {
-    id: 'styrofoam',
+  폼이: {
     characterType: 'sub',
     wasteName: '발포합성수지',
-    characterName: '푸키',
+    characterName: '폼이',
     wasteImage: Styrofoam,
     characterImage: StyrofoamCharacter,
     description: '거품은 제거 후, 오염된 건 일반쓰레기!',
