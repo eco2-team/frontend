@@ -1,5 +1,6 @@
 import ChatInputBar from '@/components/chat/ChatInputBar';
 import ChatMessageList from '@/components/chat/ChatMessageList';
+import { START_ASSISTANT_MESSAGE } from '@/constants/ChatConfig';
 import { useEffect, useRef, useState } from 'react';
 
 export type MessageType = 'text' | 'image';
@@ -35,11 +36,7 @@ const Chat = () => {
   };
 
   useEffect(() => {
-    addMessage(
-      'assistant',
-      '안녕하세요! 저는 이코예요. 분리수거에 대해 궁금한게 있으면 물어봐주세요!',
-      'text',
-    );
+    addMessage('assistant', START_ASSISTANT_MESSAGE, 'text');
   }, []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
