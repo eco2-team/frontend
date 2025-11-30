@@ -5,6 +5,7 @@ import { MapBottomSheet } from '@/components/map/MapBottomSheet';
 import { MapFloatingView } from '@/components/map/MapFloatingView';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { MapQueries } from '@/api/services/map/map.queries';
+import { toast } from '@/components/Toast/toast';
 
 const Map = () => {
   const kakaoMapRef = useRef<kakao.maps.Map>(null);
@@ -100,6 +101,9 @@ const Map = () => {
     kakaoMapRef.current?.panTo(moveLatLng);
   };
 
+  if (isLoading) toast.success('위치 정보를 불러오고 있습니다.');
+  if (error) toast.error(error);
+
   return (
     <div className='relative h-full w-full overflow-y-hidden'>
       <MapView
@@ -123,20 +127,6 @@ const Map = () => {
         selectedId={selectedId}
         setSelectedId={handleSetSelectedId}
       />
-
-      {/* 위치 로딩 중 표시 */}
-      {isLoading && (
-        <div className='absolute top-3 left-1/2 -translate-x-1/2 rounded bg-white/90 px-4 py-2 text-sm shadow-md'>
-          📍 위치 정보 가져오는 중...
-        </div>
-      )}
-
-      {/* 에러 메시지 표시 */}
-      {error && (
-        <div className='absolute top-3 left-1/2 -translate-x-1/2 rounded bg-white/90 px-4 py-2 text-sm text-red-500 shadow-md'>
-          {error}
-        </div>
-      )}
     </div>
   );
 };
