@@ -30,8 +30,7 @@ const Answer = () => {
     }
   }, [resultStatus]);
 
-  // TODO: 해당 화면 재구성 필요
-  if (!pipeline_result) return <div>Error</div>;
+  if (!pipeline_result) return null;
 
   const { classification_result, final_answer } = pipeline_result;
 

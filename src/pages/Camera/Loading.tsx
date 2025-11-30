@@ -58,6 +58,10 @@ const Loading = () => {
     if (!minTimeElapsed || !isScanComplete) return;
 
     // API 완료 및 최소 대기 시간 경과 시 다음 페이지로 이동
+    if (!scanData.pipeline_result) {
+      navigate('/camera/error', { replace: true });
+      return;
+    }
     navigate('/camera/answer', {
       state: {
         imageFile,
