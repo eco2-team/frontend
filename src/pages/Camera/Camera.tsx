@@ -25,8 +25,8 @@ const Camera = () => {
     isVideoReady,
   });
 
-  const handleCapture = () => {
-    const imageFile = captureImage();
+  const handleCapture = async () => {
+    const imageFile = await captureImage();
     if (!imageFile) return;
 
     console.log('📤 서버 전송 예정:', imageFile);
