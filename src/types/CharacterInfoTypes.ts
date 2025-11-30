@@ -3,7 +3,6 @@ import type { CHARACTER_DATA } from '@/constants/CharacterInfo';
 export type CharacterType = 'main' | 'sub';
 
 export type CharacterItem = {
-  id: string;
   characterType: CharacterType;
   wasteName: string;
   characterName: string;
@@ -15,5 +14,11 @@ export type CharacterItem = {
 
 export type CharacterDataMap = Record<string, CharacterItem>;
 
+type CharacterDataType = typeof CHARACTER_DATA;
+
 /** "paper" | "paperProduct" | "pet" | ... | "sofa" */
-export type CharacterKey = keyof typeof CHARACTER_DATA;
+export type CharacterKey = keyof CharacterDataType;
+
+/** "페이피" | 팩토리" | " 페티" | ... | "푸키" */
+export type CharacterNames =
+  CharacterDataType[keyof CharacterDataType]['characterName'];
