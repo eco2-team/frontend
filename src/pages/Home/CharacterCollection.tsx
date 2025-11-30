@@ -15,7 +15,7 @@ const size: Record<CharacterType, { w: string; h: string; mb: string }> = {
 
 // 공통 스타일 정의
 const CARD_STYLE = {
-  base: 'flex flex-col items-center pb-4.5 justify-end shrink-0 w-[106px] h-[106px] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.10)] transition-transform duration-200',
+  base: 'flex flex-col items-center pb-4.5 justify-end shrink-0 w-full max-w-[106px] h-[106px] rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.10)] transition-transform duration-200',
 
   acquired: (isSelected: boolean) =>
     `border-[1.352px] border-brand-primary pt-4.5 cursor-pointer active:scale-105 ${
@@ -37,7 +37,7 @@ const header = ({
   acquiredList: CharacterKey[];
   totalWasteCnt: number;
 }) => (
-  <div className='flex flex-row justify-between pb-6'>
+  <div className='flex flex-row justify-between'>
     <span className='text-text-primary text-[17px] leading-6 font-semibold tracking-[-0.312px]'>
       캐릭터 컬렉션
     </span>
@@ -71,7 +71,7 @@ const CharacterCollection = ({
       header={header({ acquiredList, totalWasteCnt })}
     >
       {/* 캐릭터 리스트 */}
-      <div className='grid grid-cols-2 place-items-center gap-[13px] sm:grid-cols-3'>
+      <div className='mt-6 grid grid-cols-3 place-items-center gap-[13px]'>
         {CHARACTER_LIST.map((item) => {
           const isAcquired = acquiredList.includes(item.id);
           const isSelected = selectedCharacter === item.id;
@@ -81,12 +81,12 @@ const CharacterCollection = ({
               key={item.id}
               role='button'
               onClick={() => isAcquired && setSelectedCharacter(item.id)}
-              className={` ${CARD_STYLE.base} ${isAcquired ? CARD_STYLE.acquired(isSelected) : CARD_STYLE.locked} `}
+              className={`${CARD_STYLE.base} ${isAcquired ? CARD_STYLE.acquired(isSelected) : CARD_STYLE.locked}`}
             >
               <img
                 src={item.wasteImage}
                 alt={item.wasteName}
-                className={`${size[item.characterType].w} ${size[item.characterType].h} ${size[item.characterType].mb}`}
+                className={`${size[item.characterType].w} ${size[item.characterType].h} ${size[item.characterType].mb} object-contain`}
               />
 
               <p
