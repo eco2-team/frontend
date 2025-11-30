@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom';
 
 import App from '@/App.tsx';
 import { QueryClientProvider } from '@/providers/QueryClientProvider';
+import { ToastContainer } from '@/components/Toast/ToastContainer';
 import '@/style/global.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -12,6 +13,7 @@ createRoot(document.getElementById('root')!).render(
       {/* 화면 캐싱 기능 임시 해제 */}
       {/* <AliveScope> */}
       <HashRouter>
+        <ToastContainer />
         <App />
       </HashRouter>
       {/* </AliveScope> */}

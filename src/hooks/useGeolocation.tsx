@@ -59,7 +59,7 @@ export const useGeolocation = (): UseGeolocationReturn => {
       switch (err.code) {
         case 1: // PERMISSION_DENIED
           errorMsg =
-            '위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.';
+            '위치 권한이 거부되었습니다.\n브라우저 설정에서 위치 권한을 허용해주세요.';
           break;
         case 2: // POSITION_UNAVAILABLE
           errorMsg = '위치 정보를 사용할 수 없습니다.';
