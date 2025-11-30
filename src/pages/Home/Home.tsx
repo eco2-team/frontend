@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MyPage from '@/assets/icons/icon_my_page.svg';
-import { CHARACTER_DATA } from '@/constants/CharacterInfo';
+import {
+  CHARACTER_DATA,
+  CHARACTER_KEY_TO_NAME,
+} from '@/constants/CharacterInfo';
 import type { CharacterItem, CharacterNames } from '@/types/CharacterInfoTypes';
 import CharacterCollection from './CharacterCollection';
 
@@ -11,12 +14,12 @@ const Home = () => {
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterNames>('이코');
   const [viewInfo, setViewInfo] = useState<CharacterItem>(
-    CHARACTER_DATA[selectedCharacter],
+    CHARACTER_DATA[CHARACTER_KEY_TO_NAME[selectedCharacter]],
   );
   const isEco = viewInfo.characterType === 'main';
 
   useEffect(() => {
-    setViewInfo(CHARACTER_DATA[selectedCharacter]);
+    setViewInfo(CHARACTER_DATA[CHARACTER_KEY_TO_NAME[selectedCharacter]]);
   }, [selectedCharacter]);
 
   return (

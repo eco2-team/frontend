@@ -13,6 +13,15 @@ type CharacterCollectionProps = {
   setSelectedCharacter: (value: CharacterNames) => void;
 };
 
+type MyCharacterResponse = {
+  id: string;
+  code: string;
+  name: CharacterNames;
+  type: string;
+  dialog: string;
+  acquired_at: string;
+};
+
 // 쓰레기 아이콘 별 사이즈
 const size: Record<CharacterType, { w: string; h: string; mb: string }> = {
   main: { w: 'w-[53px]', h: 'h-[53px]', mb: 'mb-[7.35px]' },
@@ -70,7 +79,7 @@ const CharacterCollection = ({
         console.error('획득한 캐릭터 리스트를 불러올 수 없습니다.');
         return;
       }
-      const names = data.map((item: any) => item.name);
+      const names = data.map((item: MyCharacterResponse) => item.name);
       setAcquiredList(names);
     };
     getAcquiredCharacter();
