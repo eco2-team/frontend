@@ -5,4 +5,11 @@ export const ProfileLabels = {
   login: '간편 로그인',
 } as const;
 
-export const CantEditKeys = ['name', 'login'];
+export const USER_FIELD_MAP = {
+  nickname: 'nickname',
+  name: 'username',
+  phone_number: 'phone_number',
+  login: 'provider',
+} as const;
+
+export const CanEditKey = 'nickname';

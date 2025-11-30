@@ -2,14 +2,17 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import closeIcon from '@/assets/icons/icon_x_gray.svg';
 import { useKeyboardOffset } from '@/hooks/useKeyboardOffset';
-import { CantEditKeys, ProfileLabels } from '@/constants/UserConfig';
+import {
+  CanEditKey,
+  ProfileLabels,
+  USER_FIELD_MAP,
+} from '@/constants/UserConfig';
 import api from '@/api/axiosInstance';
-import type { ProfileLabelType, UserType } from '@/types/UserTypes';
+import type { CanEditKeyType } from '@/types/UserTypes';
 
 type EditPageState = {
-  label: ProfileLabelType;
+  label: CanEditKeyType;
   value: string;
-  menuItems: UserType[];
 };
 
 const EditPage = () => {
@@ -17,20 +20,15 @@ const EditPage = () => {
   const location = useLocation();
   const keyboardOffset = useKeyboardOffset();
 
-  const { label, value, menuItems } = location.state as EditPageState;
+  const { label, value } = location.state as EditPageState;
   const [input, setInput] = useState(value || '');
 
   const handleConfirm = async () => {
-    const patchData: Record<string, string> = {};
+    if (CanEditKey !== label) return;
 
-    menuItems.forEach((item) => {
-      if (!CantEditKeys.includes(item.label)) {
-        const key = item.label;
-        patchData[key] = item.label === label ? input.trim() : item.value;
-      }
+    await api.patch('/api/v1/user/me', {
+      [USER_FIELD_MAP[label]]: input.trim(),
     });
-
-    await api.patch('/api/v1/user/me', patchData);
     navigate(-1);
   };
 
@@ -42,7 +40,7 @@ const EditPage = () => {
     <div className='relative flex h-full w-full flex-col'>
       <div className='mt-7 flex flex-1 flex-col overflow-y-auto px-8.5'>
         <h1 className='text-text-primary mb-2 text-lg leading-7.5 font-semibold tracking-[-0.27px]'>
-          {`${ProfileLabels[label]}${label === 'phone_number' ? '를' : '을'} 입력해주세요.`}
+          {`${ProfileLabels[label]}}을 입력해주세요.`}
         </h1>
 
         <label className='text-brand-primary mt-2 mb-2.5 h-7.5 text-[10px] leading-7.5 tracking-[-0.15px]'>
@@ -51,10 +49,9 @@ const EditPage = () => {
 
         <div className='relative'>
           <input
-            type={label === 'phone_number' ? 'tel' : 'text'}
+            type={'text'}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            maxLength={label === 'phone_number' ? 11 : undefined}
             className='border-brand-primary text-text-primary w-full border-b bg-transparent px-0 py-2 text-lg font-medium placeholder-gray-400 outline-none focus:border-[#4A9B8A]'
           />
 
@@ -74,7 +71,7 @@ const EditPage = () => {
       </div>
 
       <div
-        className='max-w-app fixed right-0 left-0 mx-auto flex h-14.5 w-full shrink-0 transition-[bottom] duration-300 ease-out'
+        className='max-w-app absolute right-0 left-0 mx-auto flex h-14.5 w-full shrink-0 transition-[bottom] duration-300 ease-out'
         style={{
           bottom: keyboardOffset
             ? `${keyboardOffset}px`

@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ArrowIcon from '@/assets/icons/icon_arrow.svg';
-import { CantEditKeys, ProfileLabels } from '@/constants/UserConfig';
+import {
+  CanEditKey,
+  ProfileLabels,
+  USER_FIELD_MAP,
+} from '@/constants/UserConfig';
 import { LogoutDialog } from '@/components/myPage/LogoutDialog';
-import { type UserType } from '@/types/UserTypes';
+import { type ProfileLabelType, type UserType } from '@/types/UserTypes';
 import api from '@/api/axiosInstance';
 
 const MyPage = () => {
@@ -16,25 +20,12 @@ const MyPage = () => {
       try {
         const { data } = await api.get('/api/v1/user/me');
         if (!data) return;
-
-        setMenuItems([
-          {
-            label: 'nickname',
-            value: data.nickname || '',
-          },
-          {
-            label: 'name',
-            value: data.username || '',
-          },
-          {
-            label: 'phone_number',
-            value: data.phone_number || '',
-          },
-          {
-            label: 'login',
-            value: data.provider || '',
-          },
-        ]);
+        setMenuItems(
+          Object.entries(USER_FIELD_MAP).map(([key, value]) => ({
+            label: key as ProfileLabelType,
+            value: data[value] ?? '',
+          })),
+        );
       } catch (e) {
         console.error('사용자 정보를 가져올 수 없습니다.', e);
       }
@@ -43,14 +34,18 @@ const MyPage = () => {
   }, []);
 
   const handleEditPage = (item: UserType) => {
-    if (CantEditKeys.includes(item.label)) return;
+    if (CanEditKey !== item.label) return;
 
     // MyPage
     navigate('/myPage/edit', {
-      state: { menuItems, value: item.value, label: item.label },
+      state: { value: item.value, label: item.label },
     });
   };
-  console.log('setMenuItems', menuItems);
+
+  const formatPhone = (value: string) => {
+    if (!value) return '-'; // ''인 경우
+    return value.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  };
 
   return (
     <div className='flex h-full flex-col bg-[#F3F4F6]'>
@@ -66,12 +61,10 @@ const MyPage = () => {
             <div className='flex items-center gap-0.5'>
               <span className='text-text-secondary'>
                 {page.label === 'phone_number'
-                  ? (page.value ?? '')
-                      .toString()
-                      .replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')
-                  : (page.value ?? '')}
+                  ? formatPhone(page.value)
+                  : (page.value ?? '-')}
               </span>
-              {!CantEditKeys.includes(page.label) && (
+              {CanEditKey === page.label && (
                 <button
                   onClick={() => handleEditPage(page)}
                   className='cursor-pointer'
