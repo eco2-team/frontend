@@ -12,6 +12,7 @@ interface MapViewProps {
   ref: React.RefObject<kakao.maps.Map | null>;
   data: LocationListResponse;
   selectedId: number | null;
+  setSelectedId: (id: number | null) => void;
   userLocation: Position | null;
   handleCenterChanged: (target: kakao.maps.Map) => void;
   handleZoomChanged: (target: kakao.maps.Map) => void;
@@ -21,6 +22,7 @@ export const MapView = ({
   ref,
   data,
   selectedId,
+  setSelectedId,
   userLocation,
   handleCenterChanged,
   handleZoomChanged,
@@ -59,7 +61,7 @@ export const MapView = ({
                   src: item.id % 2 === 0 ? zeroWasteMarker : superPinMarker,
                   size: { width: 40, height: 40 },
                 }}
-                onClick={() => console.log(item)}
+                onClick={() => setSelectedId(item.id)}
               />
             ))}
       </>

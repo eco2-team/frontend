@@ -110,6 +110,7 @@ const Map = () => {
         ref={kakaoMapRef}
         data={data ?? []}
         selectedId={selectedId}
+        setSelectedId={handleSetSelectedId}
         userLocation={userLocation}
         handleCenterChanged={handleCenterChanged}
         handleZoomChanged={handleZoomChanged}
