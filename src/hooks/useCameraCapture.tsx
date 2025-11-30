@@ -16,7 +16,7 @@ export const useCameraCapture = ({
   containerRef,
   isVideoReady,
 }: UseCameraCaptureProps) => {
-  const captureImage = (): string | null => {
+  const captureImage = (): File | null => {
     if (!isVideoReady) return null;
 
     const video = videoRef.current;
@@ -63,9 +63,18 @@ export const useCameraCapture = ({
     );
 
     const imageUrl = canvas.toDataURL('image/png');
-    console.log('📸 이미지 캡처 완료');
 
-    return imageUrl;
+    const arr = imageUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    console.log('📸 이미지 캡처 완료');
+    return new File([u8arr], `image_${Date.now()}.png`, { type: mime });
   };
 
   return { captureImage };
