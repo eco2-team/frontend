@@ -10,6 +10,7 @@ export type CharacterItem = {
   wasteImage: string;
   characterImage: string;
   description: string;
+  subDescription: string;
 };
 
 export type CharacterDataMap = Record<string, CharacterItem>;

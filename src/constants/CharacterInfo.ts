@@ -27,6 +27,7 @@ import Vinyl from '@/assets/icons/icon_vinyl.svg';
 
 import type { CharacterDataMap } from '@/types/CharacterInfoTypes';
 
+// TODO: subDescription 수정 필요
 export const CHARACTER_DATA: CharacterDataMap = {
   eco: {
     id: 'eco',
@@ -36,6 +37,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Eco,
     characterImage: EcoCharacter,
     description: '환경을 사랑하는 AI 분리배출 도우미',
+    subDescription: '찰칵! 분리수거하고 이코의 친구를 얻어보세요!',
   },
   paper: {
     id: 'paper',
@@ -44,7 +46,8 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterName: '페이피',
     wasteImage: Paper,
     characterImage: PaperCharacter,
-    description: '테이프와 스테이플은 떼고 깨끗하게 접어요!',
+    description: '골판지류ㆍ신문지ㆍ과자상자ㆍ백판지ㆍ책자',
+    subDescription: '테이프와 스테이플은 떼고 깨끗하게 접어요!',
   },
   paperProduct: {
     id: 'paperProduct',
@@ -53,7 +56,8 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterName: '팩토리',
     wasteImage: PaperProducts,
     characterImage: PaperProductsCharacter,
-    description: '물로 헹구고 라벨을 제거하는 멋진 팩토리!',
+    description: '일반팩ㆍ주스팩ㆍ소주팩ㆍ두유팩',
+    subDescription: '물로 헹구고 라벨을 제거하는 멋진 팩토리!',
   },
   pet: {
     id: 'pet',
@@ -62,7 +66,8 @@ export const CHARACTER_DATA: CharacterDataMap = {
     characterName: '페티',
     wasteImage: Pet,
     characterImage: PetCharacter,
-    description: '라벨과 뚜껑을 분리하고 투명하게 헹궈줘요!',
+    description: '먹는샘물 페트병ㆍ음료 페트병',
+    subDescription: '라벨과 뚜껑을 분리하고 투명하게 헹궈줘요!',
   },
 
   vinyl: {
@@ -73,6 +78,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Vinyl,
     characterImage: VinylCharacter,
     description: '이물질과 내용물을 제거하고 모아서 배출해!',
+    subDescription: '이물질과 내용물을 제거하고 모아서 배출해!',
   },
   glass: {
     id: 'glass',
@@ -82,6 +88,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Glass,
     characterImage: GlassCharacter,
     description: '라벨과 뚜껑을 제거하고 색 별로 구분해 배출해요!',
+    subDescription: '라벨과 뚜껑을 제거하고 색 별로 구분해 배출해요!',
   },
   clothes: {
     id: 'clothes',
@@ -91,6 +98,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Clothes,
     characterImage: ClothesCharacter,
     description: '젖지 않게 모아서 수거함에 넣어봐요!',
+    subDescription: '젖지 않게 모아서 수거함에 넣어봐요!',
   },
   plastic: {
     id: 'plastic',
@@ -100,6 +108,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Plastic,
     characterImage: PlasticCharacter,
     description: '세척 후 잘 말리고 압착해서 버려요!',
+    subDescription: '세척 후 잘 말리고 압착해서 버려요!',
   },
   metal: {
     id: 'metal',
@@ -109,6 +118,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Metal,
     characterImage: MetalCharacter,
     description: '음식물을 깨끗히 제거 후 분리배출해봐!',
+    subDescription: '음식물을 깨끗히 제거 후 분리배출해봐!',
   },
   battery: {
     id: 'battery',
@@ -118,6 +128,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Battery,
     characterImage: BatteryCharacter,
     description: '본체와 분리해서 전용 수거함에 버려요!',
+    subDescription: '본체와 분리해서 전용 수거함에 버려요!',
   },
   lighting: {
     id: 'lighting',
@@ -127,6 +138,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Lighting,
     characterImage: LightingCharacter,
     description: '형광등은 깨지지 않게 포장해서 전용수거함으로!',
+    subDescription: '형광등은 깨지지 않게 포장해서 전용수거함으로!',
   },
   monitor: {
     id: 'monitor',
@@ -136,6 +148,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Monitor,
     characterImage: MonitorCharacter,
     description: '그냥은 안돼! 전자제품은 가까운 수거센터로!',
+    subDescription: '그냥은 안돼! 전자제품은 가까운 수거센터로!',
   },
   styrofoam: {
     id: 'styrofoam',
@@ -145,6 +158,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Styrofoam,
     characterImage: StyrofoamCharacter,
     description: '거품은 제거 후, 오염된 건 일반쓰레기!',
+    subDescription: '거품은 제거 후, 오염된 건 일반쓰레기!',
   },
 } as const;
 
