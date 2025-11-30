@@ -1,10 +1,16 @@
+import api from '@/api/axiosInstance';
 import { BottomSheet } from '@/components/bottomSheet/BottomSheet';
 import { CHARACTER_DATA, CHARACTER_LIST } from '@/constants/CharacterInfo';
-import type { CharacterKey, CharacterType } from '@/types/CharacterInfoTypes';
+import type {
+  CharacterKey,
+  CharacterNames,
+  CharacterType,
+} from '@/types/CharacterInfoTypes';
+import { useEffect, useState } from 'react';
 
 type CharacterCollectionProps = {
-  selectedCharacter?: CharacterKey;
-  setSelectedCharacter: (value: CharacterKey) => void;
+  selectedCharacter?: CharacterNames;
+  setSelectedCharacter: (value: CharacterNames) => void;
 };
 
 // 쓰레기 아이콘 별 사이즈
@@ -54,13 +60,21 @@ const CharacterCollection = ({
   selectedCharacter,
   setSelectedCharacter,
 }: CharacterCollectionProps) => {
-  // const [acquiredList, setAcquiredList] = useState<CharacterKey[]>([
-  //   'eco',
-  //   'paper',
-  // ]);
-  // set미사용으로 인한 vercel 오류로 임시 처리
-  const acquiredList: CharacterKey[] = ['eco', 'paper'];
+  const [acquiredList, setAcquiredList] = useState<CharacterNames[]>([]);
   const totalWasteCnt = Object.keys(CHARACTER_DATA).length;
+
+  useEffect(() => {
+    const getAcquiredCharacter = async () => {
+      const { data } = await api.get('/api/v1/user/me/characters');
+      if (!data) {
+        console.error('획득한 캐릭터 리스트를 불러올 수 없습니다.');
+        return;
+      }
+      const names = data.map((item: any) => item.name);
+      setAcquiredList(names);
+    };
+    getAcquiredCharacter();
+  }, []);
 
   return (
     <BottomSheet
@@ -73,15 +87,17 @@ const CharacterCollection = ({
       {/* 캐릭터 리스트 */}
       <div className='mt-6 grid grid-cols-3 place-items-center gap-[13px]'>
         {CHARACTER_LIST.map((item) => {
-          const isAcquired = acquiredList.includes(item.id);
-          const isSelected = selectedCharacter === item.id;
+          const isAcquired = acquiredList.includes(item.characterName);
+          const isSelected = selectedCharacter === item.characterName;
 
           return (
             <div
-              key={item.id}
+              key={item.characterName}
               role='button'
-              onClick={() => isAcquired && setSelectedCharacter(item.id)}
-              className={`${CARD_STYLE.base} ${isAcquired ? CARD_STYLE.acquired(isSelected) : CARD_STYLE.locked}`}
+              onClick={() =>
+                isAcquired && setSelectedCharacter(item.characterName)
+              }
+              className={` ${CARD_STYLE.base} ${isAcquired ? CARD_STYLE.acquired(isSelected) : CARD_STYLE.locked} `}
             >
               <img
                 src={item.wasteImage}
