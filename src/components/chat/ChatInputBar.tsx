@@ -3,31 +3,93 @@ import cameraIcon from '@/assets/icons/icon_camera.svg';
 import sendIcon from '@/assets/icons/icon_send.svg';
 import sendDisabledIcon from '@/assets/icons/icon_send.svg';
 import type { RoleType, MessageType } from '@/pages/Chat/Chat';
+import api from '@/api/axiosInstance';
+import axios from 'axios';
+import { END_ASSISTANT_MESSAGE } from '@/constants/ChatConfig';
 
 type ChatInputBarProp = {
   addMessage: (role: RoleType, content: string, type: MessageType) => void;
+  setIsSending: (sending: boolean) => void;
 };
 
-const ChatInputBar = ({ addMessage }: ChatInputBarProp) => {
+const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
   const [text, setText] = useState('');
-  const [image, setImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>();
+  const [sessionId, setSessionId] = useState<string>();
 
-  const handleSend = () => {
-    if (!text && !image) return;
+  const handleSend = async () => {
+    if (!(text || imageFile)) return;
 
-    if (image) {
-      // TODO: 이미지 S3로 변환 후 전달
-      addMessage('user', image, 'image');
-    }
-    if (text.length > 0) {
-      addMessage('user', text, 'text');
-    }
     setText('');
-    setImage(null);
+    setImageFile(null);
+
+    try {
+      let cdnUrl: string | null = null;
+
+      if (imageFile) {
+        const fileMeta = {
+          filename: imageFile.name,
+          content_type: imageFile.type,
+        };
+
+        // Presigned URL 요청
+        const { data: presignedData } = await api.post(
+          '/api/v1/images/chat',
+          fileMeta,
+          {
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+
+        const uploadUrl = presignedData.upload_url;
+        if (!uploadUrl) throw new Error('업로드 URL이 없습니다.');
+
+        // 이미지 업로드
+        await axios.put(uploadUrl, imageFile, {
+          headers: { 'Content-Type': imageFile.type },
+        });
+
+        cdnUrl = presignedData.cdn_url;
+      }
+
+      // 로컬 메시지 상태 업데이트
+      if (cdnUrl) addMessage('user', cdnUrl, 'image');
+      if (text) addMessage('user', text, 'text');
+      setIsSending(true);
+
+      const payload = {
+        session_id: sessionId,
+        message: text,
+        temperature: 0.2,
+        image_url: cdnUrl,
+      };
+
+      const response = await api.post('/api/v1/chat/messages', payload);
+
+      if (!response || !response.data) {
+        console.error('[chat] no response data', response);
+        return;
+      }
+
+      const { data } = response;
+
+      if (data.session_id) {
+        setSessionId(data.session_id);
+      }
+
+      if (data.user_answer) {
+        addMessage('assistant', data.user_answer, 'text');
+        addMessage('assistant', END_ASSISTANT_MESSAGE, 'text');
+      }
+    } catch (err) {
+      console.error('채팅 전송 중 오류 발생:', err);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleImageDelete = () => {
-    setImage(null);
+    setImageFile(null);
   };
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -36,13 +98,13 @@ const ChatInputBar = ({ addMessage }: ChatInputBarProp) => {
     fileInputRef.current?.click();
   };
 
-  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraCapture = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const imageUrl = URL.createObjectURL(file);
-
-    setImage(imageUrl);
+    setImageFile(file);
   };
 
   return (
@@ -58,11 +120,11 @@ const ChatInputBar = ({ addMessage }: ChatInputBarProp) => {
       />
 
       {/* 선택된 이미지가 있을 때만 표시 */}
-      {image && (
+      {imageFile && (
         <div className='flex justify-start'>
           <div className='relative'>
             <img
-              src={image}
+              src={URL.createObjectURL(imageFile)}
               alt='preview'
               className='h-20 w-20 rounded-md border object-cover'
             />
@@ -102,9 +164,9 @@ const ChatInputBar = ({ addMessage }: ChatInputBarProp) => {
         </div>
 
         {/* 전송 버튼 */}
-        <button onClick={handleSend} disabled={!text && !image}>
+        <button onClick={handleSend} disabled={!(text || imageFile)}>
           <img
-            src={text || image ? sendIcon : sendDisabledIcon}
+            src={text || imageFile ? sendIcon : sendDisabledIcon}
             alt='send'
             className='h-[38px] w-[38px]'
           />
