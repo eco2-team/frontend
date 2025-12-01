@@ -52,7 +52,7 @@ const header = ({
   acquiredList: CharacterKey[];
   totalWasteCnt: number;
 }) => (
-  <div className='flex flex-row justify-between pb-3'>
+  <div className='mb-3 flex flex-row justify-between'>
     <span className='text-text-primary text-[17px] leading-6 font-semibold tracking-[-0.312px]'>
       캐릭터 컬렉션
     </span>
@@ -106,7 +106,7 @@ const CharacterCollection = ({
               onClick={() =>
                 isAcquired && setSelectedCharacter(item.characterName)
               }
-              className={` ${CARD_STYLE.base} ${isAcquired ? CARD_STYLE.acquired(isSelected) : CARD_STYLE.locked} `}
+              className={`${CARD_STYLE.base} ${isAcquired ? CARD_STYLE.acquired(isSelected) : CARD_STYLE.locked}`}
             >
               <img
                 src={item.wasteImage}
