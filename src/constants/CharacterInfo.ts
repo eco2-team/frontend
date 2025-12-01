@@ -35,6 +35,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   eco: {
     characterType: 'main',
     wasteName: '이코',
+    middle_category: '이코',
     characterName: '이코',
     wasteImage: Eco,
     characterImage: EcoCharacter,
@@ -44,6 +45,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   paper: {
     characterType: 'sub',
     wasteName: '종이',
+    middle_category: '종이',
     characterName: '페이피',
     wasteImage: Paper,
     characterImage: PaperCharacter,
@@ -53,6 +55,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   paperProduct: {
     characterType: 'sub',
     wasteName: '종이팩',
+    middle_category: '종이팩',
     characterName: '팩토리',
     wasteImage: PaperProducts,
     characterImage: PaperProductsCharacter,
@@ -62,6 +65,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   pet: {
     characterType: 'sub',
     wasteName: '무색페트병',
+    middle_category: '무색페트병',
     characterName: '페티',
     wasteImage: Pet,
     characterImage: PetCharacter,
@@ -71,6 +75,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   vinyl: {
     characterType: 'sub',
     wasteName: '비닐류',
+    middle_category: '비닐류',
     characterName: '비니',
     wasteImage: Vinyl,
     characterImage: VinylCharacter,
@@ -80,6 +85,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   glass: {
     characterType: 'sub',
     wasteName: '유리병',
+    middle_category: '유리병',
     characterName: '글래시',
     wasteImage: Glass,
     characterImage: GlassCharacter,
@@ -89,6 +95,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   clothes: {
     characterType: 'sub',
     wasteName: '의류·원단',
+    middle_category: '의류및원단',
     characterName: '코튼',
     wasteImage: Clothes,
     characterImage: ClothesCharacter,
@@ -98,6 +105,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   plastic: {
     characterType: 'sub',
     wasteName: '플라스틱류',
+    middle_category: '플라스틱류',
     characterName: '플리',
     wasteImage: Plastic,
     characterImage: PlasticCharacter,
@@ -107,6 +115,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   metal: {
     characterType: 'sub',
     wasteName: '금속류',
+    middle_category: '금속류',
     characterName: '메탈리',
     wasteImage: Metal,
     characterImage: MetalCharacter,
@@ -116,6 +125,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   battery: {
     characterType: 'sub',
     wasteName: '전지',
+    middle_category: '전지',
     characterName: '배리',
     wasteImage: Battery,
     characterImage: BatteryCharacter,
@@ -125,6 +135,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   lighting: {
     characterType: 'sub',
     wasteName: '조명제품',
+    middle_category: '조명제품',
     characterName: '라이티',
     wasteImage: Lighting,
     characterImage: LightingCharacter,
@@ -134,6 +145,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   monitor: {
     characterType: 'sub',
     wasteName: '전기전자',
+    middle_category: '전기전자제품',
     characterName: '일렉',
     wasteImage: Monitor,
     characterImage: MonitorCharacter,
@@ -144,6 +156,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
   styrofoam: {
     characterType: 'sub',
     wasteName: '발포합성수지',
+    middle_category: '발포합성수지',
     characterName: '폼이',
     wasteImage: Styrofoam,
     characterImage: StyrofoamCharacter,

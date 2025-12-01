@@ -5,6 +5,7 @@ export type CharacterType = 'main' | 'sub';
 export type CharacterItem = {
   characterType: CharacterType;
   wasteName: string;
+  middle_category: string; // API response
   characterName: string;
   wasteImage: string;
   characterImage: string;
