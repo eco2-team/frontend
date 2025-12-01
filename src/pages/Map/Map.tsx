@@ -94,6 +94,7 @@ const Map = () => {
 
   const handleSetSelectedId = (id: number | null) => {
     setSelectedId(id);
+    handleScrollToTop();
 
     const targetLocation = data?.find((item) => item.id === id);
     if (!id || !targetLocation) return;
@@ -105,6 +106,15 @@ const Map = () => {
       targetLocation.longitude,
     );
     kakaoMapRef.current?.panTo(moveLatLng);
+  };
+
+  const handleScrollToTop = () => {
+    const scrollContainer = document.getElementById(
+      'bottom-sheet-scroll-container',
+    );
+    if (scrollContainer) {
+      scrollContainer.scrollTo({ top: 0, behavior: 'instant' });
+    }
   };
 
   const sortedData = useMemo(() => {
