@@ -87,7 +87,8 @@ const ChatMessageList = ({ messages, isSending }: ChatMessageListProps) => {
 
         const isContinued = prev?.role === msg.role; // 전 메시지와 동일한 화자인지
         const isSameTime =
-          next?.role === msg.role && next?.timestamp === msg.timestamp; // 다음 메시지와 동일한 화자, 시간인지
+          next?.role === msg.role &&
+          getFormattedTime(next?.timestamp) === getFormattedTime(msg.timestamp); // 다음 메시지와 동일한 화자, 시간인지
 
         if (msg.role === 'assistant') {
           return (

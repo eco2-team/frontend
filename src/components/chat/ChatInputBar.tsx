@@ -114,7 +114,7 @@ const ChatInputBar = ({
   };
 
   return (
-    <div className='max-w-app absolute bottom-0 flex w-full flex-col gap-3 bg-white px-4 pt-3 pb-[23px] shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
+    <div className='max-w-app absolute bottom-0 flex w-full flex-col gap-3 bg-white px-4 pt-3 pb-6 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
       {/* 숨겨진 카메라 input */}
       <input
         ref={fileInputRef}

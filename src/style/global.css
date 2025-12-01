@@ -165,3 +165,8 @@ textarea {
 .animate-slide-down {
   animation: slide-down 0.3s ease-out;
 }
+
+video {
+  transform: translateZ(0); /* 하드웨어 가속 유도 */
+  will-change: transform;
+}

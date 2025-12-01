@@ -20,10 +20,9 @@ const Chat = () => {
 
   // 유저의 메시지를 형식에 맞게 추가
   const addMessage = (role: RoleType, content: string, type: MessageType) => {
-    const formattedContent = content.replace(
-      /(\*\*([^*]+)\*\*)/g,
-      '<span className="font-semibold">$2</span>',
-    );
+    const formattedContent = content
+      .replace(/\*\*([^*]+)\*\*/g, '<span class="font-semibold">$1</span>')
+      .replace(/([A-Za-z가-힣]\. )/g, '$1<br/>');
 
     const newMessage: ChatMessage = {
       role,
@@ -55,7 +54,7 @@ const Chat = () => {
       </div>
 
       {/* 채팅 인풋바 영역 */}
-      <div className='h-chat-input-bar shrink-0'>
+      <div className='h-chat-input-bar shrink-0 pb-6'>
         <ChatInputBar
           addMessage={addMessage}
           isSending={isSending}

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import AILoadingGif from '@/assets/images/mainCharacter/AI_Loading.gif';
+import AILoadingVideo from '@/assets/images/mainCharacter/AI_Loading.mp4';
 import { useScanClassifyMutation } from '@/api/services/scan/scan.mutation';
 import { useUploadImageMutation } from '@/api/services/image/image.mutation';
 import { ImageService } from '@/api/services/image/image.service';
@@ -14,6 +14,13 @@ const Loading = () => {
   const { imageFile } = location.state;
 
   const { currentStep, minTimeElapsed } = useLoadingSteps();
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      setIsVisible(true);
+    });
+  }, []);
 
   const {
     mutate: classifyScan,
@@ -71,12 +78,20 @@ const Loading = () => {
   }, [minTimeElapsed, isScanComplete, scanData, navigate, imageFile]);
 
   return (
-    <div className='flex h-full w-full flex-col items-center justify-center'>
-      <img
-        src={AILoadingGif}
-        alt='eco-character'
-        className='h-[132px] w-[132px]'
-      />
+    <div
+      className={`flex h-full w-full flex-col items-center justify-center overflow-hidden transition-opacity duration-700 ${isVisible ? 'opacity-100' : 'opacity-0'} `}
+    >
+      <video
+        autoPlay
+        loop
+        muted
+        controls={false}
+        playsInline
+        preload='auto'
+        className='h-38 w-38 object-contain'
+      >
+        <source src={AILoadingVideo} type='video/mp4' />
+      </video>
 
       <div className='mt-[52px] flex-col items-center text-center'>
         <p className='text-text-secondary mb-3 text-[15px] leading-5 tracking-[-0.15px]'>
