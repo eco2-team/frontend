@@ -143,7 +143,7 @@ const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
         {/* 카메라 */}
         <button
           onClick={openCamera}
-          className='flex h-7 w-7 items-center justify-center'
+          className='flex h-10 w-10 items-center justify-center'
         >
           <img
             src={cameraIcon}

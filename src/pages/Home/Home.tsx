@@ -40,7 +40,7 @@ const Home = () => {
           onClick={() => navigate('/myPage')}
         />
       </div>
-      <div className='flex h-[45%] w-full flex-col items-center justify-end'>
+      <div className='flex h-[45%] w-full flex-col items-center justify-end pb-3'>
         {/* 말풍선 */}
         <div
           className={`flex w-full justify-end pr-6 ${isEco ? 'pb-1.5' : 'pb-3'}`}

@@ -55,9 +55,10 @@ export const BottomSheet = ({
     ).getPropertyValue('--height-bottom-nav');
     const bottomNavHeight = parseFloat(bottomNavHeightValue) || 0;
 
-    return (
-      window.innerHeight - (isFullScreen ? 0 : safeAreaTop) - bottomNavHeight
-    );
+    const root = document.getElementById('root');
+    const rootHeight = root?.clientHeight ?? window.innerHeight;
+
+    return rootHeight - (isFullScreen ? 0 : safeAreaTop) - bottomNavHeight;
   }, [isFullScreen]);
 
   // 높이를 픽셀로 변환 (전체 화면 높이 기준)
