@@ -1,13 +1,9 @@
-import ErrorImage from '@/assets/images/mainCharacter/main_6.svg';
+import ErrorImage from '@/assets/images/mainCharacter/main_6.png';
 
 const Error = () => {
   return (
     <div className='flex h-full w-full flex-col items-center justify-center'>
-      <img
-        src={ErrorImage}
-        alt='eco-character'
-        className='h-[144px] w-[144px]'
-      />
+      <img src={ErrorImage} alt='eco-character-error' className='h-36 w-36' />
 
       <div className='mt-7 flex flex-col items-center gap-4 px-[53px] text-center'>
         <h1 className='text-text-primary text-xl leading-8 font-extrabold tracking-[0.07px]'>
