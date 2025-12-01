@@ -8,6 +8,7 @@ import { CelebrationEffect } from '@/components/camera/CelebrationEffect';
 import { RecycleInfoCard } from '@/components/camera/RecycleInfoCard';
 import { RecyclingGuideCard } from '@/components/camera/RecyclingGuideCard';
 import { ResultNavigationBtn } from '@/components/camera/ResultNavigationBtn';
+import { WasteCategoryMap } from '@/types/MapTypes';
 
 const Answer = () => {
   const navigate = useNavigate();
@@ -33,15 +34,23 @@ const Answer = () => {
   if (!pipeline_result) return null;
 
   const { classification_result, final_answer } = pipeline_result;
+  const middleCategory = classification_result.classification.middle_category;
 
   const targetCharacter = CHARACTER_LIST.find(
-    (c) =>
-      c.middle_category ===
-      classification_result.classification.middle_category,
+    (c) => c.middle_category === middleCategory,
   );
 
   const handleCelebrationComplete = () => {
     setShowCelebration(false);
+  };
+
+  const handleNavigateToMap = () => {
+    navigate('/map', {
+      replace: true,
+      state: {
+        filter: WasteCategoryMap[middleCategory],
+      },
+    });
   };
 
   return (
@@ -60,7 +69,7 @@ const Answer = () => {
             {reward && (
               <div
                 role='button'
-                onClick={() => navigate('/map', { replace: true })}
+                onClick={handleNavigateToMap}
                 className='absolute bottom-3.5 left-1/2 flex h-[33px] w-[146px] -translate-x-1/2 cursor-pointer items-center justify-center gap-1 rounded-[80px] bg-white shadow-md'
               >
                 <img src={CoinIcon} alt='coin-icon' />
@@ -80,9 +89,11 @@ const Answer = () => {
 
           <RecyclingGuideCard data={final_answer.disposal_steps} />
 
-          <ResultNavigationBtn
-            type={resultStatus === 'good' ? 'home' : 'camera'}
-          />
+          {!targetCharacter && (
+            <ResultNavigationBtn
+              type={resultStatus === 'good' ? 'home' : 'camera'}
+            />
+          )}
         </div>
       </div>
 

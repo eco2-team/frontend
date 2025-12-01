@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from '@/components/Toast/toast';
 import type { ToggleType } from '@/api/services/map/map.type';
 import { MapQueries } from '@/api/services/map/map.queries';
@@ -10,6 +11,9 @@ import { useGeolocation } from '@/hooks/useGeolocation';
 import type { WasteTypeKey } from '@/types/MapTypes';
 
 const Map = () => {
+  const location = useLocation();
+  const filter = (location.state as { filter?: WasteTypeKey } | null)?.filter;
+
   const kakaoMapRef = useRef<kakao.maps.Map>(null);
 
   const { userLocation, center, setCenter, error, isLoading } =
@@ -21,7 +25,9 @@ const Map = () => {
   const [radius, setRadius] = useState<number>();
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
   const [toggle, setToggle] = useState<ToggleType>('all');
-  const [selectedFilter, setSelectedFilter] = useState<WasteTypeKey[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<WasteTypeKey[]>(
+    filter ? [filter] : [],
+  );
 
   const { data, refetch } = useQuery({
     ...MapQueries.getLocations({
@@ -118,6 +124,11 @@ const Map = () => {
     }
   };
 
+  const handleSetToggle = (toggle: ToggleType) => {
+    setToggle(toggle);
+    handleScrollToTop();
+  };
+
   const sortedData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
@@ -156,7 +167,7 @@ const Map = () => {
       />
       <MapFloatingView
         toggle={toggle}
-        setToggle={setToggle}
+        setToggle={handleSetToggle}
         isMyLocation={
           userLocation?.lat === center?.lat && userLocation?.lng === center?.lng
         }

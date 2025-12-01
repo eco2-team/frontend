@@ -25,3 +25,18 @@ export const WasteType = {
 } as const;
 
 export type WasteTypeKey = keyof typeof WasteType;
+
+export const WasteCategoryMap: Record<string, WasteTypeKey> = {
+  종이: 'paper',
+  종이팩: 'paper',
+  무색페트병: 'clear_pet',
+  비닐류: 'general',
+  유리병: 'glass',
+  의류및원단: 'textile',
+  플라스틱류: 'plastic',
+  금속류: 'general',
+  전지: 'electronics',
+  조명제품: 'general',
+  전기전자제품: 'electronics',
+  발포합성수지: 'general',
+};
