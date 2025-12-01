@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from '@/components/Toast/toast';
 import type { ToggleType } from '@/api/services/map/map.type';
 import { MapQueries } from '@/api/services/map/map.queries';
@@ -118,6 +119,11 @@ const Map = () => {
     }
   };
 
+  const handleSetToggle = (toggle: ToggleType) => {
+    setToggle(toggle);
+    handleScrollToTop();
+  };
+
   const sortedData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
@@ -156,7 +162,7 @@ const Map = () => {
       />
       <MapFloatingView
         toggle={toggle}
-        setToggle={setToggle}
+        setToggle={handleSetToggle}
         isMyLocation={
           userLocation?.lat === center?.lat && userLocation?.lng === center?.lng
         }
