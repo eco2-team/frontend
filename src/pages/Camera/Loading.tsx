@@ -67,6 +67,7 @@ const Loading = () => {
         imageFile,
         data: scanData,
       },
+      replace: true,
     });
   }, [minTimeElapsed, isScanComplete, scanData, navigate, imageFile]);
 
