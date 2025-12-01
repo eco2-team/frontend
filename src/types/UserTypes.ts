@@ -8,3 +8,10 @@ export type UserType = {
 };
 
 export type CanEditKeyType = typeof CanEditKey;
+
+export type UserInfoResponse = {
+  nickname: string;
+  username: string;
+  phone_number: string | null;
+  provider: string;
+};
