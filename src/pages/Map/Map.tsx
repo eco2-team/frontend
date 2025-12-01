@@ -11,6 +11,9 @@ import { useGeolocation } from '@/hooks/useGeolocation';
 import type { WasteTypeKey } from '@/types/MapTypes';
 
 const Map = () => {
+  const location = useLocation();
+  const filter = (location.state as { filter?: WasteTypeKey } | null)?.filter;
+
   const kakaoMapRef = useRef<kakao.maps.Map>(null);
 
   const { userLocation, center, setCenter, error, isLoading } =
@@ -22,7 +25,9 @@ const Map = () => {
   const [radius, setRadius] = useState<number>();
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
   const [toggle, setToggle] = useState<ToggleType>('all');
-  const [selectedFilter, setSelectedFilter] = useState<WasteTypeKey[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<WasteTypeKey[]>(
+    filter ? [filter] : [],
+  );
 
   const { data, refetch } = useQuery({
     ...MapQueries.getLocations({
