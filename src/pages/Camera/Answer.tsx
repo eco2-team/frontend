@@ -25,17 +25,17 @@ const Answer = () => {
   const resultStatus = reward === null ? 'bad' : 'good';
 
   useEffect(() => {
-    if (resultStatus === 'good') {
+    if (resultStatus === 'good' && reward?.received) {
       setShowCelebration(true);
     }
-  }, [resultStatus]);
+  }, [resultStatus, reward?.received]);
 
   if (!pipeline_result) return null;
 
   const { classification_result, final_answer } = pipeline_result;
 
   const targetCharacter = CHARACTER_LIST.find(
-    (c) => c.wasteName === classification_result.classification.middle_category,
+    (c) => c.characterName === reward?.name,
   );
 
   const handleCelebrationComplete = () => {

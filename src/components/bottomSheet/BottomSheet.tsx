@@ -237,6 +237,7 @@ export const BottomSheet = ({
 
       {/* 스크롤 가능한 컨텐츠 영역 */}
       <div
+        id='bottom-sheet-scroll-container'
         ref={contentRef}
         className='no-scrollbar flex-1 overflow-y-auto overscroll-contain px-6'
         onTouchStart={handleContentTouchStart}
