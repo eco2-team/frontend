@@ -55,7 +55,7 @@ const Chat = () => {
       </div>
 
       {/* 채팅 인풋바 영역 */}
-      <div className='h-chat-input-bar shrink-0'>
+      <div className='h-chat-input-bar shrink-0 pb-6'>
         <ChatInputBar
           addMessage={addMessage}
           isSending={isSending}
