@@ -17,7 +17,11 @@ type UserChatProps = {
 };
 
 type ChatMessageListProps = { messages: ChatMessage[]; isSending: boolean };
-
+export const TYPING_HTML = `
+  <span class="eco-dot"></span>
+  <span class="eco-dot"></span>
+  <span class="eco-dot"></span>
+`;
 const getFormattedTime = (isoString: string) => {
   const date = new Date(isoString);
   return date.toLocaleTimeString('ko-KR', {
@@ -116,11 +120,11 @@ const ChatMessageList = ({ messages, isSending }: ChatMessageListProps) => {
 
         return null;
       })}
-      {isSending && (
+      {!isSending && (
         <EcoChat
           key={messages.length + 1}
-          type={'text'}
-          content={"<span className='font-semibold'>···</span>"}
+          type='text'
+          content={TYPING_HTML}
           isContinued={false}
           isSameTime={false}
         />
