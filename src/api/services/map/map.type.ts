@@ -20,6 +20,7 @@ export type LocationListItemResponse = {
   distance_km?: number;
   distance_text?: string;
   is_open?: boolean;
+  is_holiday?: boolean;
   start_time?: string;
   end_time?: string;
   phone?: string;

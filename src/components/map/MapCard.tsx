@@ -4,6 +4,7 @@ import ZeroWasteIcon from '@/assets/icons/icon_zerowaste_2.svg';
 import TimeIcon from '@/assets/icons/icon_time.svg';
 import CallIcon from '@/assets/icons/icon_call.svg';
 import RedTimeIcon from '@/assets/icons/icon_time_red.svg';
+import { WasteType, type WasteTypeKey } from '@/types/MapTypes';
 
 const ICONS = {
   keco: SuperBinIcon,
@@ -62,8 +63,8 @@ export const MapCard = ({
           <img src={IconSrc} alt={location.source} className='h-12 w-12' />
         </div>
 
-        <div className='flex-1'>
-          <div className='mb-2.5 flex items-start justify-between'>
+        <div className='flex flex-1 flex-col gap-3'>
+          <div className='flex items-start justify-between'>
             <div>
               <p className='text-text-primary mb-[3px] text-[15px] leading-6 font-semibold tracking-tight'>
                 {location.name}
@@ -78,29 +79,39 @@ export const MapCard = ({
           </div>
 
           {location.pickup_categories && (
-            <div className='text-text-primary mb-3 text-xs leading-4'>
+            <div className='text-text-primary text-xs leading-4'>
               <span className='mr-1.5 font-medium'>수거품목</span>
-              <span>{location.pickup_categories.join('∙')}</span>
+              <span>
+                {location.pickup_categories
+                  .map((item) => WasteType[item as WasteTypeKey])
+                  .join('∙')}
+              </span>
             </div>
           )}
 
-          <div className='flex items-center gap-4 text-xs text-gray-500'>
-            {location.is_open ? (
-              <InfoItem
-                icon={TimeIcon}
-                text={`${location.start_time} ~ ${location.end_time}`}
-                alt='운영 시간'
-              />
-            ) : (
-              <InfoItem
-                icon={RedTimeIcon}
-                text='오늘 휴무'
-                alt='운영 시간'
-                isRed={true}
-              />
-            )}
-            <InfoItem icon={CallIcon} text={location.phone} alt='전화번호' />
-          </div>
+          {(location.source === 'keco' && location.is_holiday) ||
+            (location.phone && (
+              <div className='flex items-center gap-4 text-xs text-gray-500'>
+                {location.source === 'keco' && location.is_holiday && (
+                  <InfoItem
+                    icon={location.is_holiday ? RedTimeIcon : TimeIcon}
+                    text={
+                      location.is_holiday
+                        ? '오늘 휴무'
+                        : `${location.start_time} ~ ${location.end_time}`
+                    }
+                    alt='운영 시간'
+                    isRed={location.is_holiday}
+                  />
+                )}
+
+                <InfoItem
+                  icon={CallIcon}
+                  text={location.phone}
+                  alt='전화번호'
+                />
+              </div>
+            ))}
         </div>
       </div>
     </div>
