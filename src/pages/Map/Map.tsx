@@ -21,6 +21,7 @@ const Map = () => {
   const [radius, setRadius] = useState<number>();
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
   const [toggle, setToggle] = useState<ToggleType>('all');
+  const [selectedFilter, setSelectedFilter] = useState<WasteTypeKey[]>([]);
 
   const { data, refetch } = useQuery({
     ...MapQueries.getLocations({
@@ -123,12 +124,21 @@ const Map = () => {
     const filteredBySource =
       toggle === 'all' ? data : data.filter((item) => item.source === toggle);
 
-    return filteredBySource.slice().sort((a, b) => {
+    const filteredByCategories =
+      selectedFilter.length > 0
+        ? filteredBySource.filter((item) =>
+            item.pickup_categories?.some((category) =>
+              selectedFilter.includes(category as WasteTypeKey),
+            ),
+          )
+        : filteredBySource;
+
+    return filteredByCategories.slice().sort((a, b) => {
       if (a.id === selectedId) return -1;
       if (b.id === selectedId) return 1;
       return 0;
     });
-  }, [data, selectedId, toggle]);
+  }, [data, selectedFilter, selectedId, toggle]);
 
   if (isLoading) toast.success('위치 정보를 불러오고 있습니다.');
   if (error) toast.error(error);
@@ -158,6 +168,8 @@ const Map = () => {
         data={sortedData}
         selectedId={selectedId}
         setSelectedId={handleSetSelectedId}
+        selectedFilter={selectedFilter}
+        setSelectedFilter={setSelectedFilter}
       />
     </div>
   );

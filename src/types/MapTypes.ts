@@ -12,41 +12,16 @@ export interface MapCardType {
   phone: string;
 }
 
-export const MapTemplateData: MapCardType[] = [
-  {
-    id: 1,
-    name: '수퍼빈 강남역점',
-    type: 'superBin' as const,
-    distance: '120m',
-    description: 'AI 재활용 수거함',
-    hours: '24시간',
-    phone: '1588-1234',
-  },
-  {
-    id: 2,
-    name: '알맹상점',
-    type: 'zeroWaste' as const,
-    distance: '350m',
-    description: '제로웨이스트 가게',
-    hours: '10:00 - 20:00',
-    phone: '02-2345-6789',
-  },
-  {
-    id: 3,
-    name: '수퍼빈 역삼역점',
-    type: 'superBin' as const,
-    distance: '480m',
-    description: 'AI 재활용 수거함',
-    hours: '24시간',
-    phone: '1588-1234',
-  },
-  {
-    id: 4,
-    name: '더피커',
-    type: 'zeroWaste' as const,
-    distance: '560m',
-    description: '제로웨이스트 가게',
-    hours: '11:00 - 19:00',
-    phone: '02-4567-8901',
-  },
-];
+export const WasteType = {
+  clear_pet: '투명 페트병',
+  colored_pet: '유색 페트병',
+  can: '캔류',
+  paper: '종이류',
+  plastic: '플라스틱류',
+  glass: '유리류',
+  textile: '의류·섬유류',
+  electronics: '전자제품/건전지',
+  general: '기타',
+} as const;
+
+export type WasteTypeKey = keyof typeof WasteType;
