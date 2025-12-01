@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from '@/components/Toast/toast';
+import type { ToggleType } from '@/api/services/map/map.type';
+import { MapQueries } from '@/api/services/map/map.queries';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_ZOOM, MapView } from '@/components/map/MapView';
-import { MapBottomSheet } from '@/components/map/MapBottomSheet';
 import { MapFloatingView } from '@/components/map/MapFloatingView';
+import { MapBottomSheet } from '@/components/map/bottomSheet/MapBottomSheet';
 import { useGeolocation } from '@/hooks/useGeolocation';
-import { MapQueries } from '@/api/services/map/map.queries';
-import { toast } from '@/components/Toast/toast';
+import type { WasteTypeKey } from '@/types/MapTypes';
 
 const Map = () => {
   const kakaoMapRef = useRef<kakao.maps.Map>(null);
@@ -18,6 +20,7 @@ const Map = () => {
   const [reSearch, setReSearch] = useState(false);
   const [radius, setRadius] = useState<number>();
   const [mapZoom, setMapZoom] = useState<number>(DEFAULT_ZOOM);
+  const [toggle, setToggle] = useState<ToggleType>('all');
 
   const { data, refetch } = useQuery({
     ...MapQueries.getLocations({
@@ -44,6 +47,7 @@ const Map = () => {
   }, [refetch, shouldRefetch]);
 
   const handleRefetchCenterLocation = () => {
+    handleSetSelectedId(null);
     refetch();
   };
 
@@ -89,6 +93,8 @@ const Map = () => {
   };
 
   const handleSetSelectedId = (id: number | null) => {
+    setSelectedId(id);
+
     const targetLocation = data?.find((item) => item.id === id);
     if (!id || !targetLocation) return;
 
@@ -101,6 +107,19 @@ const Map = () => {
     kakaoMapRef.current?.panTo(moveLatLng);
   };
 
+  const sortedData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+
+    const filteredBySource =
+      toggle === 'all' ? data : data.filter((item) => item.source === toggle);
+
+    return filteredBySource.slice().sort((a, b) => {
+      if (a.id === selectedId) return -1;
+      if (b.id === selectedId) return 1;
+      return 0;
+    });
+  }, [data, selectedId, toggle]);
+
   if (isLoading) toast.success('위치 정보를 불러오고 있습니다.');
   if (error) toast.error(error);
 
@@ -108,7 +127,7 @@ const Map = () => {
     <div className='relative h-full w-full overflow-y-hidden'>
       <MapView
         ref={kakaoMapRef}
-        data={data ?? []}
+        data={sortedData}
         selectedId={selectedId}
         setSelectedId={handleSetSelectedId}
         userLocation={userLocation}
@@ -116,6 +135,8 @@ const Map = () => {
         handleZoomChanged={handleZoomChanged}
       />
       <MapFloatingView
+        toggle={toggle}
+        setToggle={setToggle}
         isMyLocation={
           userLocation?.lat === center?.lat && userLocation?.lng === center?.lng
         }
@@ -124,7 +145,7 @@ const Map = () => {
         moveToMyLocation={handleMoveToMyLocation}
       />
       <MapBottomSheet
-        data={data ?? []}
+        data={sortedData}
         selectedId={selectedId}
         setSelectedId={handleSetSelectedId}
       />

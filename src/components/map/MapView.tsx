@@ -44,12 +44,11 @@ export const MapView = ({
             position={userLocation}
             image={{
               src: userMarker,
-              size: { width: 48, height: 48 },
+              size: { width: 38, height: 38 },
             }}
           />
         )}
 
-        {/* 근처 제로 웨이스트샵 및 수퍼빈 표시 (임시 데이터) */}
         {data.length > 0 &&
           data
             .filter((item) => selectedId === null || item.id === selectedId)
@@ -58,7 +57,10 @@ export const MapView = ({
                 key={index}
                 position={{ lat: item.latitude, lng: item.longitude }}
                 image={{
-                  src: item.id % 2 === 0 ? zeroWasteMarker : superPinMarker,
+                  src:
+                    item.source === 'zerowaste'
+                      ? zeroWasteMarker
+                      : superPinMarker,
                   size: { width: 40, height: 40 },
                 }}
                 onClick={() => setSelectedId(item.id)}

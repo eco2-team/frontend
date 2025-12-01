@@ -5,3 +5,22 @@ export const DEFAULT_CENTER: Position = {
   lat: 37.567976,
   lng: 127.009341,
 } as const;
+
+export const TOGGLE_TRANSITION_MAP = {
+  all: {
+    zerowaste: 'keco',
+    keco: 'zerowaste',
+  },
+  keco: {
+    zerowaste: 'all',
+    keco: 'none',
+  },
+  zerowaste: {
+    zerowaste: 'none',
+    keco: 'all',
+  },
+  none: {
+    zerowaste: 'zerowaste',
+    keco: 'keco',
+  },
+} as const;

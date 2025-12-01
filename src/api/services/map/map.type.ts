@@ -7,6 +7,9 @@ export type LocationListRequest = {
   pickup_category?: string;
 };
 
+export type ToggleType = 'all' | SourceType | 'none';
+export type SourceType = 'keco' | 'zerowaste';
+
 export type LocationListItemResponse = {
   id: number;
   name: string;
