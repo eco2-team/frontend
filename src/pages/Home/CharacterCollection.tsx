@@ -52,7 +52,7 @@ const header = ({
   acquiredList: CharacterKey[];
   totalWasteCnt: number;
 }) => (
-  <div className='flex flex-row justify-between'>
+  <div className='flex flex-row justify-between pb-3'>
     <span className='text-text-primary text-[17px] leading-6 font-semibold tracking-[-0.312px]'>
       캐릭터 컬렉션
     </span>
@@ -94,7 +94,7 @@ const CharacterCollection = ({
       header={header({ acquiredList, totalWasteCnt })}
     >
       {/* 캐릭터 리스트 */}
-      <div className='mt-6 grid grid-cols-3 place-items-center gap-[13px]'>
+      <div className='mt-3 grid grid-cols-3 place-items-center gap-[13px]'>
         {CHARACTER_LIST.map((item) => {
           const isAcquired = acquiredList.includes(item.characterName);
           const isSelected = selectedCharacter === item.characterName;
