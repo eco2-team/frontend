@@ -78,7 +78,7 @@ export const MapCard = ({
             </span>
           </div>
 
-          {location.pickup_categories && (
+          {location.pickup_categories && location.source === 'keco' && (
             <div className='text-text-primary text-xs leading-4'>
               <span className='mr-1.5 font-medium'>수거품목</span>
               <span>
