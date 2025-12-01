@@ -1,5 +1,17 @@
 import { type RefObject } from 'react';
 
+const canvasToFile = (canvas: HTMLCanvasElement): Promise<File> => {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], `image_${Date.now()}.png`, {
+        type: 'image/png',
+      });
+      resolve(file);
+    }, 'image/png');
+  });
+};
+
 interface UseCameraCaptureProps {
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -16,7 +28,7 @@ export const useCameraCapture = ({
   containerRef,
   isVideoReady,
 }: UseCameraCaptureProps) => {
-  const captureImage = (): string | null => {
+  const captureImage = async (): Promise<File | null> => {
     if (!isVideoReady) return null;
 
     const video = videoRef.current;
@@ -62,10 +74,9 @@ export const useCameraCapture = ({
       containerHeight,
     );
 
-    const imageUrl = canvas.toDataURL('image/png');
+    const file = await canvasToFile(canvas);
     console.log('📸 이미지 캡처 완료');
-
-    return imageUrl;
+    return file;
   };
 
   return { captureImage };

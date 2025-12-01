@@ -26,18 +26,13 @@ const Camera = () => {
   });
 
   const handleCapture = async () => {
-    const imageUrl = captureImage();
-    if (!imageUrl) return;
+    const imageFile = await captureImage();
+    if (!imageFile) return;
 
-    // TODO: axios.post(imageUrl)
-    console.log('📤 서버 전송 예정:', imageUrl);
-
+    console.log('📤 서버 전송 예정:', imageFile);
     stopCamera();
-
     navigate('/camera/loading', {
-      state: {
-        imageUrl: imageUrl,
-      },
+      state: { imageFile },
     });
   };
 

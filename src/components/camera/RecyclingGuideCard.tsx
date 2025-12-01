@@ -1,5 +1,5 @@
 interface RecyclingGuideCardProps {
-  data: string[];
+  data: Record<string, string>;
 }
 
 export const RecyclingGuideCard = ({ data }: RecyclingGuideCardProps) => {
@@ -13,12 +13,12 @@ export const RecyclingGuideCard = ({ data }: RecyclingGuideCardProps) => {
       </h1>
 
       <div className='flex flex-col gap-1.5'>
-        {data.map((text, index) => (
+        {Object.entries(data).map(([step, text]) => (
           <p
-            key={index}
+            key={step}
             className='text-text-primary text-[14px] leading-7.5 tracking-[0px]'
           >
-            <span className='font-semibold'> {`${index + 1}단계: `}</span>
+            <span className='font-semibold'> {`${step}: `}</span>
             {text}
           </p>
         ))}
