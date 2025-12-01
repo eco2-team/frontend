@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import homeActive from '@/assets/icons/home_active.svg';
 import infoActive from '@/assets/icons/info_active.svg';
 import mapActive from '@/assets/icons/map_active.svg';
@@ -8,52 +8,60 @@ import mapInActive from '@/assets/icons/map_inactive.svg';
 import chatInActive from '@/assets/icons/chat_inactive.svg';
 import camera from '@/assets/images/camera/camera.png';
 
-const BottomNav = () => {
-  const tabs = [
-    {
-      path: '/home',
-      label: 'HOME',
-      icon: homeInActive,
-      activeIcon: homeActive,
-    },
-    { path: '/chat', label: 'CHAT', icon: chatInActive },
-    { path: '/camera', label: 'CAMERA', icon: camera, isCenter: true },
-    {
-      path: '/info',
-      label: 'INFO',
-      icon: infoInActive,
-      activeIcon: infoActive,
-    },
-    {
-      path: '/map',
-      label: 'MAP',
-      icon: mapInActive,
-      activeIcon: mapActive,
-    },
-  ];
+const tabs = [
+  {
+    path: '/home',
+    label: 'HOME',
+    icon: homeInActive,
+    activeIcon: homeActive,
+  },
+  { path: '/chat', label: 'CHAT', icon: chatInActive },
+  { path: '/camera', label: 'CAMERA', icon: camera, isCenter: true },
+  {
+    path: '/info',
+    label: 'INFO',
+    icon: infoInActive,
+    activeIcon: infoActive,
+  },
+  {
+    path: '/map',
+    label: 'MAP',
+    icon: mapInActive,
+    activeIcon: mapActive,
+  },
+];
 
-  const bottomItem = (
-    label: string,
-    icon: string,
-    activeIcon: string,
-    isActive: boolean,
-  ) => {
-    return (
-      <div className='h-bottom-nav flex w-14 flex-col items-center justify-end gap-1 pb-6'>
-        <img
-          src={isActive && activeIcon ? activeIcon : icon}
-          alt={label}
-          className='h-6 w-6 transition-all duration-150'
-        />
-        <span
-          className={`text-[10px] font-bold ${
-            isActive ? 'text-brand-primary' : 'text-text-inactive'
-          }`}
-        >
-          {label}
-        </span>
-      </div>
-    );
+const bottomItem = (
+  label: string,
+  icon: string,
+  activeIcon: string,
+  isActive: boolean,
+) => {
+  return (
+    <div className='h-bottom-nav flex w-14 flex-col items-center justify-end gap-1 pb-6'>
+      <img
+        src={isActive && activeIcon ? activeIcon : icon}
+        alt={label}
+        className='h-6 w-6 transition-all duration-150'
+      />
+      <span
+        className={`text-[10px] font-bold ${
+          isActive ? 'text-brand-primary' : 'text-text-inactive'
+        }`}
+      >
+        {label}
+      </span>
+    </div>
+  );
+};
+
+const BottomNav = () => {
+  const navigate = useNavigate();
+
+  const handleNavigate = (path: string) => {
+    navigate(path, {
+      replace: path === '/chat' || path === '/camera' ? false : true,
+    });
   };
 
   return (
@@ -62,6 +70,10 @@ const BottomNav = () => {
         <NavLink
           key={path}
           to={path}
+          onClick={(e) => {
+            e.preventDefault();
+            handleNavigate(path);
+          }}
           className={`relative flex flex-col items-center text-center ${isCenter ? 'mx-8' : ''}`}
         >
           {({ isActive }) =>

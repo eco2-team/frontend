@@ -4,6 +4,7 @@ import CameraContainer from '@/assets/images/camera/camera_container.png';
 import { CameraPermissionDialog } from '@/components/camera/CameraPermissionDialog';
 import { useCamera } from '@/hooks/useCamera';
 import { useCameraCapture } from '@/hooks/useCameraCapture';
+import CancelIcon from '@/assets/icons/iconoir_cancel_white.svg';
 
 const Camera = () => {
   const navigate = useNavigate();
@@ -60,6 +61,13 @@ const Camera = () => {
           playsInline
           muted
           className='h-full w-full object-cover'
+        />
+
+        <img
+          src={CancelIcon}
+          alt='cancel'
+          className='absolute top-[calc(var(--safe-area-top)+22px)] right-7.5 h-7.5 w-7.5 cursor-pointer'
+          onClick={() => navigate(-1)}
         />
 
         <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center'>
