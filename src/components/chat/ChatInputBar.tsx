@@ -5,7 +5,6 @@ import SendInactiveIcon from '@/assets/icons/icon_send_inactive.svg';
 import type { RoleType, MessageType } from '@/pages/Chat/Chat';
 import api from '@/api/axiosInstance';
 import axios from 'axios';
-import { END_ASSISTANT_MESSAGE } from '@/constants/ChatConfig';
 
 type ChatInputBarProp = {
   addMessage: (role: RoleType, content: string, type: MessageType) => void;
@@ -85,7 +84,6 @@ const ChatInputBar = ({
 
       if (data.user_answer) {
         addMessage('assistant', data.user_answer, 'text');
-        addMessage('assistant', END_ASSISTANT_MESSAGE, 'text');
       }
     } catch (err) {
       console.error('채팅 전송 중 오류 발생:', err);
