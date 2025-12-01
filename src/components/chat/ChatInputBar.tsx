@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import cameraIcon from '@/assets/icons/icon_camera.svg';
-import sendIcon from '@/assets/icons/icon_send.svg';
-import sendDisabledIcon from '@/assets/icons/icon_send.svg';
+import SendActiveIcon from '@/assets/icons/icon_send_active.svg';
+import SendInactiveIcon from '@/assets/icons/icon_send_inactive.svg';
 import type { RoleType, MessageType } from '@/pages/Chat/Chat';
 import api from '@/api/axiosInstance';
 import axios from 'axios';
@@ -10,12 +10,18 @@ import { END_ASSISTANT_MESSAGE } from '@/constants/ChatConfig';
 type ChatInputBarProp = {
   addMessage: (role: RoleType, content: string, type: MessageType) => void;
   setIsSending: (sending: boolean) => void;
+  isSending: boolean;
 };
 
-const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
+const ChatInputBar = ({
+  addMessage,
+  setIsSending,
+  isSending,
+}: ChatInputBarProp) => {
   const [text, setText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>();
   const [sessionId, setSessionId] = useState<string>();
+  const canSend = (text || imageFile) && !isSending;
 
   const handleSend = async () => {
     if (!(text || imageFile)) return;
@@ -164,9 +170,9 @@ const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
         </div>
 
         {/* 전송 버튼 */}
-        <button onClick={handleSend} disabled={!(text || imageFile)}>
+        <button onClick={handleSend} disabled={!canSend}>
           <img
-            src={text || imageFile ? sendIcon : sendDisabledIcon}
+            src={canSend ? SendActiveIcon : SendInactiveIcon}
             alt='send'
             className='h-[38px] w-[38px]'
           />
