@@ -35,7 +35,9 @@ const Answer = () => {
   const { classification_result, final_answer } = pipeline_result;
 
   const targetCharacter = CHARACTER_LIST.find(
-    (c) => c.characterName === reward?.name,
+    (c) =>
+      c.middle_category ===
+      classification_result.classification.middle_category,
   );
 
   const handleCelebrationComplete = () => {
