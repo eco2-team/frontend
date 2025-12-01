@@ -80,9 +80,11 @@ const Answer = () => {
 
           <RecyclingGuideCard data={final_answer.disposal_steps} />
 
-          <ResultNavigationBtn
-            type={resultStatus === 'good' ? 'home' : 'camera'}
-          />
+          {!targetCharacter && (
+            <ResultNavigationBtn
+              type={resultStatus === 'good' ? 'home' : 'camera'}
+            />
+          )}
         </div>
       </div>
 
