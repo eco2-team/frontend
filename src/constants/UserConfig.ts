@@ -13,3 +13,5 @@ export const USER_FIELD_MAP = {
 } as const;
 
 export const CanEditKey = 'nickname';
+
+export const STORAGE_USER_KEY = 'userInfo';
