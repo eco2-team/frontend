@@ -89,7 +89,7 @@ const Answer = () => {
 
           <RecyclingGuideCard data={final_answer.disposal_steps} />
 
-          {!targetCharacter && (
+          {targetCharacter && (
             <ResultNavigationBtn
               type={resultStatus === 'good' ? 'home' : 'camera'}
             />
