@@ -78,7 +78,7 @@ const BottomNav = () => {
         >
           {({ isActive }) =>
             isCenter ? (
-              <div className='absolute bottom-0 flex h-14 w-14 items-center justify-center transition-transform hover:scale-105'>
+              <div className='absolute bottom-0 flex h-15 w-15 items-center justify-center transition-transform hover:scale-105'>
                 <img src={icon} alt={label} />
               </div>
             ) : (
