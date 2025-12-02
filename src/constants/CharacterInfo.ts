@@ -70,7 +70,7 @@ export const CHARACTER_DATA: CharacterDataMap = {
     wasteImage: Pet,
     characterImage: PetCharacter,
     description: '먹는샘물 페트병ㆍ음료 페트병',
-    subDescription: '라벨과 뚜껑을 분리하고 투명하게 헹궈요!',
+    subDescription: '라벨을 분리하고 투명하게 헹궈요!',
   },
   vinyl: {
     characterType: 'sub',
