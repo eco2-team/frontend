@@ -41,9 +41,14 @@ export const useCamera = (): UseCameraReturn => {
 
       if (video) {
         video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          setIsVideoReady(true);
-          console.log('✅ 카메라 스트림 시작');
+        video.onloadedmetadata = async () => {
+          try {
+            await video.play();
+            setIsVideoReady(true);
+            console.log('✅ 카메라 스트림 시작');
+          } catch (err) {
+            console.error('비디오 재생 실패:', err);
+          }
         };
       }
 
