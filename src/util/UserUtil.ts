@@ -17,3 +17,7 @@ export const updateStorageNickname = (newNickname: string) => {
   user.nickname = newNickname;
   localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
 };
+
+export const clearStorageUserInfo = () => {
+  localStorage.removeItem(STORAGE_USER_KEY);
+};

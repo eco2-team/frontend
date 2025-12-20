@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Dialog } from '@/components/dialog/Dialog';
 import api from '@/api/axiosInstance';
+import { clearStorageUserInfo } from '@/util/UserUtil';
 
 interface LogoutDialogProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export const LogoutDialog = ({ isOpen, onClose }: LogoutDialogProps) => {
       const { data } = await api.post('/api/v1/auth/logout');
 
       if (data.success) {
+        clearStorageUserInfo();
         onClose();
         navigate('/login', { replace: true });
       }
