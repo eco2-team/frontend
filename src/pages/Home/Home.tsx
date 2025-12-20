@@ -22,26 +22,24 @@ const Home = () => {
   const isEco = viewInfo.characterType === 'main';
 
   useEffect(() => {
-    const userInfo = getStorageUserInfo();
+    // 항상 서버에서 최신 사용자 정보를 가져옴
+    const fetchUser = async () => {
+      try {
+        const { data } = await api.get('/api/v1/user/me');
+        if (!data) return;
 
-    // localStorage에 값이 있으면 상태 업데이트
-    if (userInfo && userInfo.nickname !== nickname) {
-      setNickname(userInfo.nickname);
-      return;
-    }
-
-    // localStorage에 값이 없을 때만 서버 호출
-    const setUser = async () => {
-      const { data } = await api.get('/api/v1/user/me');
-      if (!data) return;
-
-      const user = data as UserInfoResponse;
-      setStorageUserInfo(user);
-      setNickname(user.nickname);
+        const user = data as UserInfoResponse;
+        setStorageUserInfo(user);
+        setNickname(user.nickname);
+      } catch (err) {
+        // 에러 시 캐시된 값 사용 (fallback)
+        const cached = getStorageUserInfo();
+        if (cached) setNickname(cached.nickname);
+      }
     };
 
-    if (!userInfo) setUser();
-  });
+    fetchUser();
+  }, []);
 
   useEffect(() => {
     setViewInfo(CHARACTER_DATA[CHARACTER_KEY_TO_NAME[selectedCharacter]]);
