@@ -8,13 +8,26 @@ import { LOADING_STEPS } from '@/constants/AnswerConfig';
 import { LoadingStep } from '@/components/camera/LoadingStep';
 import { useLoadingSteps } from '@/hooks/useLoadingSteps';
 
+// 🔍 DEBUG: 디버그 로그 함수
+const debugLog = (tag: string, ...args: unknown[]) => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] 🔍 ${tag}:`, ...args);
+};
+
 const Loading = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { imageFile } = location.state;
 
+  debugLog('INIT', 'Loading 컴포넌트 마운트', { imageFile: imageFile?.name, imageType: imageFile?.type, imageSize: imageFile?.size });
+
   const { currentStep, minTimeElapsed } = useLoadingSteps();
   const [isVisible, setIsVisible] = useState(false);
+
+  // 🔍 DEBUG: 상태 변화 추적
+  useEffect(() => {
+    debugLog('STATE', 'minTimeElapsed 변경', { minTimeElapsed });
+  }, [minTimeElapsed]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -26,31 +39,78 @@ const Loading = () => {
     mutate: classifyScan,
     data: scanData,
     isSuccess: isScanComplete,
+    isPending: isScanPending,
+    isError: isScanError,
+    error: scanError,
   } = useScanClassifyMutation({
     onSuccess: (data) => {
-      console.log('✅ 스캔 분류 완료:', data);
+      debugLog('SCAN_SUCCESS', '스캔 분류 완료', JSON.stringify(data, null, 2));
     },
     onError: (error) => {
-      console.error('❌ 스캔 분류 실패:', error);
+      debugLog('SCAN_ERROR', '스캔 분류 실패', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        raw: error,
+      });
     },
   });
 
-  const { mutate: uploadImage } = useUploadImageMutation({
+  // 🔍 DEBUG: scan 상태 추적
+  useEffect(() => {
+    debugLog('SCAN_STATE', 'scan mutation 상태', {
+      isScanComplete,
+      isScanPending,
+      isScanError,
+      scanError: scanError?.message,
+      scanData: scanData ? JSON.stringify(scanData).substring(0, 500) : null,
+    });
+  }, [isScanComplete, isScanPending, isScanError, scanError, scanData]);
+
+  const { mutate: uploadImage, isPending: isUploadPending, isError: isUploadError, error: uploadError } = useUploadImageMutation({
     onSuccess: async (data) => {
-      const response = await ImageService.putUploadImageUDN(
-        data.upload_url,
-        imageFile,
-      );
-      console.log('📤 CDN 업로드 성공:', response);
-      classifyScan({ image_url: data.cdn_url });
+      debugLog('UPLOAD_URL_SUCCESS', 'Presigned URL 받음', { upload_url: data.upload_url, cdn_url: data.cdn_url });
+      try {
+        const response = await ImageService.putUploadImageUDN(
+          data.upload_url,
+          imageFile,
+        );
+        debugLog('CDN_UPLOAD_SUCCESS', 'CDN 업로드 성공', { response });
+        debugLog('SCAN_CALL', 'classifyScan 호출 시작', { image_url: data.cdn_url });
+        classifyScan({ image_url: data.cdn_url });
+      } catch (cdnError) {
+        debugLog('CDN_UPLOAD_ERROR', 'CDN 업로드 실패', cdnError);
+      }
     },
     onError: (error) => {
-      console.error('❌ 이미지 업로드 실패:', error);
+      debugLog('UPLOAD_URL_ERROR', 'Presigned URL 요청 실패', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      });
     },
   });
+
+  // 🔍 DEBUG: upload 상태 추적
+  useEffect(() => {
+    debugLog('UPLOAD_STATE', 'upload mutation 상태', {
+      isUploadPending,
+      isUploadError,
+      uploadError: uploadError?.message,
+    });
+  }, [isUploadPending, isUploadError, uploadError]);
 
   useEffect(() => {
-    if (!imageFile) return;
+    if (!imageFile) {
+      debugLog('UPLOAD_SKIP', 'imageFile이 없음');
+      return;
+    }
+
+    debugLog('UPLOAD_START', 'uploadImage mutation 호출', {
+      channel: 'scan',
+      filename: imageFile.name,
+      content_type: imageFile.type,
+    });
 
     uploadImage({
       channel: 'scan',
@@ -62,13 +122,25 @@ const Loading = () => {
   }, [imageFile, uploadImage]);
 
   useEffect(() => {
-    if (!minTimeElapsed || !isScanComplete) return;
+    debugLog('NAVIGATE_CHECK', '네비게이션 조건 체크', {
+      minTimeElapsed,
+      isScanComplete,
+      hasPipelineResult: !!scanData?.pipeline_result,
+      scanDataKeys: scanData ? Object.keys(scanData) : [],
+    });
+
+    if (!minTimeElapsed || !isScanComplete) {
+      debugLog('NAVIGATE_WAIT', '대기 중', { reason: !minTimeElapsed ? 'minTime 미경과' : 'scan 미완료' });
+      return;
+    }
 
     // API 완료 및 최소 대기 시간 경과 시 다음 페이지로 이동
     if (!scanData.pipeline_result) {
+      debugLog('NAVIGATE_ERROR', 'pipeline_result 없음 → error 페이지로', { scanData });
       navigate('/camera/error', { replace: true });
       return;
     }
+    debugLog('NAVIGATE_SUCCESS', 'answer 페이지로 이동', { category: scanData.pipeline_result?.classification_result?.classification?.major_category });
     navigate('/camera/answer', {
       state: {
         imageFile,
