@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, useCallback, type RefObject } from 'react';
 
 interface UseCameraReturn {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -24,9 +24,24 @@ export const useCamera = (): UseCameraReturn => {
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
 
+  // videoRef가 준비될 때까지 대기하는 헬퍼 함수
+  const waitForVideoRef = useCallback(async (maxRetries = 10): Promise<HTMLVideoElement | null> => {
+    for (let i = 0; i < maxRetries; i++) {
+      if (videoRef.current) {
+        console.log(`✅ videoRef 준비됨 (시도 ${i + 1}/${maxRetries})`);
+        return videoRef.current;
+      }
+      console.log(`⏳ videoRef 대기 중... (시도 ${i + 1}/${maxRetries})`);
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    console.error('❌ videoRef를 찾을 수 없음');
+    return null;
+  }, []);
+
   const startCamera = async (): Promise<MediaStream | null> => {
     try {
       setPermissionDenied(false);
+      console.log('🎬 카메라 시작 시도...');
 
       const constraints = {
         video: {
@@ -35,22 +50,41 @@ export const useCamera = (): UseCameraReturn => {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('✅ getUserMedia 성공, 스트림 획득');
       allStreamsRef.current.push(stream);
 
-      const video = videoRef.current;
+      // videoRef가 준비될 때까지 대기
+      const video = await waitForVideoRef();
 
       if (video) {
         video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          setIsVideoReady(true);
-          console.log('✅ 카메라 스트림 시작');
+        console.log('✅ video.srcObject 설정 완료');
+        
+        // 여러 이벤트 리스너 등록 (iOS 호환성)
+        const handleReady = () => {
+          if (!isVideoReady) {
+            setIsVideoReady(true);
+            console.log('✅ 카메라 스트림 시작 (비디오 준비됨)');
+          }
         };
+
+        video.onloadedmetadata = handleReady;
+        video.oncanplay = handleReady;
+        video.onplaying = handleReady;
+        
+        // 이미 준비된 경우 (캐시된 스트림 등)
+        if (video.readyState >= 2) {
+          console.log('✅ video.readyState 이미 준비됨:', video.readyState);
+          handleReady();
+        }
+      } else {
+        console.error('❌ video 엘리먼트를 찾을 수 없음, 스트림만 저장');
       }
 
       streamRef.current = stream;
       return stream;
     } catch (err) {
-      console.error('카메라 오류: ', err);
+      console.error('❌ 카메라 오류: ', err);
 
       if (
         err instanceof DOMException &&
