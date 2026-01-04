@@ -32,9 +32,9 @@ export const CelebrationEffect = ({
 }: CelebrationEffectProps) => {
   useEffect(() => {
     const timer = setTimeout(() => {
-      // 3초 후 자동으로 사라지게
+      // 5초 후 자동으로 사라지게
       onComplete();
-    }, 3000);
+    }, 5000);
 
     return () => clearTimeout(timer);
   }, [onComplete]);

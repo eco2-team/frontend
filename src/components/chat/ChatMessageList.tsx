@@ -18,6 +18,12 @@ type UserChatProps = {
 
 type ChatMessageListProps = { messages: ChatMessage[]; isSending: boolean };
 
+const TYPING_HTML = `
+  <span class="eco-dot"></span>
+  <span class="eco-dot"></span>
+  <span class="eco-dot"></span>
+`;
+
 const getFormattedTime = (isoString: string) => {
   const date = new Date(isoString);
   return date.toLocaleTimeString('ko-KR', {
@@ -87,7 +93,8 @@ const ChatMessageList = ({ messages, isSending }: ChatMessageListProps) => {
 
         const isContinued = prev?.role === msg.role; // 전 메시지와 동일한 화자인지
         const isSameTime =
-          next?.role === msg.role && next?.timestamp === msg.timestamp; // 다음 메시지와 동일한 화자, 시간인지
+          next?.role === msg.role &&
+          getFormattedTime(next?.timestamp) === getFormattedTime(msg.timestamp); // 다음 메시지와 동일한 화자, 시간인지
 
         if (msg.role === 'assistant') {
           return (
@@ -118,8 +125,8 @@ const ChatMessageList = ({ messages, isSending }: ChatMessageListProps) => {
       {isSending && (
         <EcoChat
           key={messages.length + 1}
-          type={'text'}
-          content={"<span className='font-semibold'>···</span>"}
+          type='text'
+          content={TYPING_HTML}
           isContinued={false}
           isSameTime={false}
         />

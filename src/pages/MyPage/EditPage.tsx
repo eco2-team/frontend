@@ -9,6 +9,7 @@ import {
 } from '@/constants/UserConfig';
 import api from '@/api/axiosInstance';
 import type { CanEditKeyType } from '@/types/UserTypes';
+import { updateStorageNickname } from '@/util/UserUtil';
 
 type EditPageState = {
   label: CanEditKeyType;
@@ -26,8 +27,12 @@ const EditPage = () => {
   const handleConfirm = async () => {
     if (CanEditKey !== label) return;
 
-    await api.patch('/api/v1/user/me', {
-      [USER_FIELD_MAP[label]]: input.trim(),
+    // 현재는 닉네임만 수정 가능
+    const newNickname = input.trim();
+
+    updateStorageNickname(newNickname);
+    await api.patch('/api/v1/users/me', {
+      [USER_FIELD_MAP[label]]: newNickname,
     });
     navigate(-1);
   };
@@ -40,7 +45,7 @@ const EditPage = () => {
     <div className='relative flex h-full w-full flex-col'>
       <div className='mt-7 flex flex-1 flex-col overflow-y-auto px-8.5'>
         <h1 className='text-text-primary mb-2 text-lg leading-7.5 font-semibold tracking-[-0.27px]'>
-          {`${ProfileLabels[label]}}을 입력해주세요.`}
+          {`${ProfileLabels[label]}을 입력해주세요.`}
         </h1>
 
         <label className='text-brand-primary mt-2 mb-2.5 h-7.5 text-[10px] leading-7.5 tracking-[-0.15px]'>

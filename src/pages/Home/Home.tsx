@@ -7,16 +7,39 @@ import {
 } from '@/constants/CharacterInfo';
 import type { CharacterItem, CharacterNames } from '@/types/CharacterInfoTypes';
 import CharacterCollection from './CharacterCollection';
+import api from '@/api/axiosInstance';
+import type { UserInfoResponse } from '@/types/UserTypes';
+import { getStorageUserInfo, setStorageUserInfo } from '@/util/UserUtil';
 
 const Home = () => {
   const navigate = useNavigate();
-
+  const [nickname, setNickname] = useState<string>('환경 지킴이');
   const [selectedCharacter, setSelectedCharacter] =
     useState<CharacterNames>('이코');
   const [viewInfo, setViewInfo] = useState<CharacterItem>(
     CHARACTER_DATA[CHARACTER_KEY_TO_NAME[selectedCharacter]],
   );
   const isEco = viewInfo.characterType === 'main';
+
+  useEffect(() => {
+    // 항상 서버에서 최신 사용자 정보를 가져옴
+    const fetchUser = async () => {
+      try {
+        const { data } = await api.get('/api/v1/users/me');
+        if (!data) return;
+
+        const user = data as UserInfoResponse;
+        setStorageUserInfo(user);
+        setNickname(user.nickname);
+      } catch (err) {
+        // 에러 시 캐시된 값 사용 (fallback)
+        const cached = getStorageUserInfo();
+        if (cached) setNickname(cached.nickname);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   useEffect(() => {
     setViewInfo(CHARACTER_DATA[CHARACTER_KEY_TO_NAME[selectedCharacter]]);
@@ -27,7 +50,7 @@ const Home = () => {
       <div className='flex h-[15%] w-full flex-row items-center justify-between px-6'>
         <div className='flex flex-col gap-[3px]'>
           <p className='text-text-primary text-[22px] leading-8 font-extrabold tracking-[0.07px]'>
-            반가워요 환경 지킴이님
+            {`반가워요 ${nickname}님`}
           </p>
           <p className='text-text-secondary text-[14px] leading-5 font-normal tracking-[-0.15px]'>
             오늘도 함께 지구를 지켜요!

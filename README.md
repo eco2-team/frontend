@@ -1,30 +1,54 @@
-# 🌱 이코에코(Eco²)
 
 <div align="center">
+
+# **이코에코(Eco²)**  
 <img width="100%" alt="이코에코 배너" src="https://github.com/user-attachments/assets/6a4f523a-fa37-49de-b8e1-0a5befe26605" />
+<br />
 
 ### AI 기반 분리배출 안내 서비스
+<br />
 
 **이코에코(Eco²) = Eco(AI 캐릭터) × Eco(환경)**
 
 지구를 형상화한 AI 캐릭터 '이코(Eco)'와 함께하는 분리배출 안내 환경 행동 코칭 서비스
 
-[![배포 사이트](https://img.shields.io/badge/🌐_배포_사이트-4A90E2?style=for-the-badge)](https://frontend-beta-gray-c44lrfj3n1.vercel.app/)
-[![GitHub](https://img.shields.io/badge/GitHub_Organization-181717?style=for-the-badge&logo=github)](https://github.com/orgs/eco2-team/repositories)
-[![Figma](https://img.shields.io/badge/figma-F24E1E.svg?style=for-the-badge&logo=figma&logoColor=white)](https://www.figma.com/proto/peoqcemIsMwIURd9HQMpsN/%EC%9D%B4%EC%BD%94%EC%97%90%EC%BD%94?page-id=1%3A2&node-id=225-73&viewport=1360%2C318%2C0.65&t=V5mtKkrt8rZLeS2N-1&scaling=scale-down&content-scaling=fixed&starting-point-node-id=225%3A73)
+---
 
+### 🌱 2025 새싹 해커톤
+#### AI와 함께 만드는 새로운 변화(Redesign everything with ai)
+**🏆 우수상 수상 🏆**
+<br /><br />
+<img width="650" height="487" alt="image" src="https://github.com/user-attachments/assets/06200011-6f9c-4586-945e-9ba47f075567" />
+
+---
+### 🔗 Links
+
+[![배포 사이트](https://img.shields.io/badge/🌐_배포_사이트-4A90E2?style=for-the-badge)](https://frontend.dev.growbin.app/)
+[![GitHub](https://img.shields.io/badge/GitHub_Organization-181717?style=for-the-badge&logo=github)](https://github.com/orgs/eco2-team/repositories)
+[![Figma](https://img.shields.io/badge/Figma_Prototype-F24E1E?style=for-the-badge&logo=figma&logoColor=white)](https://www.figma.com/proto/peoqcemIsMwIURd9HQMpsN/%EC%9D%B4%EC%BD%94%EC%97%90%EC%BD%94?page-id=1%3A2&node-id=225-73&viewport=1360%2C318%2C0.65&t=V5mtKkrt8rZLeS2N-1&scaling=scale-down&content-scaling=fixed&starting-point-node-id=225%3A73)
+
+
+---
+<br/><br/>
 </div>
 
-<br />
-
-## 👀 웹 서비스 소개
+## 👀  웹 서비스 소개
 
 <img width="1262" height="413" alt="image" src="https://github.com/user-attachments/assets/b5588bdc-6f20-416c-8c4c-f75bcd364168" /><br/><br/>
 
-사용자가 폐기물을 촬영하면 **Vision AI**가 품목을 분석하고 올바른 분리배출 방법을 **즉시 안내**하는 환경 행동 코칭 서비스
+배달·간편식 증가로 생활 폐기물, 특히 플라스틱 배출량이 급증하고 있음에도 시민들은 품목별 분리배출 기준을 정확히 알기 어려워 오분리 문제가 지속되고 있습니다. 기존 분리배출 앱들 역시 사용자가 직접 품목을 검색하거나 메뉴를 일일이 탐색해야 하는 번거로움으로 인해 실제 사용률이 낮은 상황입니다.
+ 
+이 문제를 해결하기 위해 저희는 **카메라 촬영만으로 AI가 폐기물을 자동 인식하고 즉시 분리방법을 안내해 사용자의 피로도를 최소화**고, **AI 캐릭터 ‘이코(Eco)’를 중심으로 한 게이미피케이션 요소 및 유상 수거함 위치 연계 등 현실 보상 기능**을 제공하는 앱을 개발하고자 하였습니다. 이를 통해 저희는 분리배출을 ‘해야 하는 일’에서 ‘하고 싶은 경험’으로 전환하는 **국내 최초의 AI 코칭 + 게임화 결합 분리수거 서비스**를 제작하고자 합니다. 
+<br/><br/>
 
-지구를 형상화한 AI 캐릭터 이코(Eco)와 함께 사용자의 분리배출 실천을 극대화해 **환경(Eco)을 보호**하자는 의미를 담고 있습니다.  
+## 🛠️ 시스템 구성도 (Architecture)
+<img width="620" height="329" alt="image" src="https://github.com/user-attachments/assets/d19a07a7-7b2e-425f-8c4f-119f0a6a3deb" />
 <br/>
+
+## 👥 개발 팀 소개
+<img width="800" height="223" alt="image" src="https://github.com/user-attachments/assets/602a8c9b-2ece-46ea-b63d-f05b5741c692" />
+
+- 개발 기간 : 📅 2025.10.23 ~ 2025.12.01
 <br/>
 
 ## ✨ 주요 기능
@@ -51,52 +75,6 @@ _"이물질이 남았으니 미지근한 물에 헹궈보세요."_ 와 같이 �
 
 <br/>
 
-## 👥 개발 팀 소개
-
-- 프론트엔드 2명, 백엔드 1명, AI 1명, 디자이너 및 기획자 1명
-
-<table>
-    <tr>
-      <td align="center">
-          팀장 / FE<br />
-        <p>
-          김채현<br />
-        </p>
-      </td>
-      <td align="center">
-           FE<br />
-        <p>
-          채수지<br />
-        </p>
-      </td>
-      <td align="center">
-           BE<br />
-        <p>
-          류지환<br />
-        </a>
-      </td>
-      <td align="center">
-           AI<br />
-        <p>
-          정태민<br />
-        </p>
-      </td>
-      <td align="center">
-          UX<br />
-        <p>
-          신수빈<br />
-        </p>
-      </td>
-    </tr>
-  </table>
-
-<br />
-
-### 📅 개발 기간
-
-- 2025.10.23 ~ 2025.12.01
-
-<br />
 
 ## 🛠 기술 스택
 

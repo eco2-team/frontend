@@ -1,21 +1,26 @@
 import { useRef, useState } from 'react';
 import cameraIcon from '@/assets/icons/icon_camera.svg';
-import sendIcon from '@/assets/icons/icon_send.svg';
-import sendDisabledIcon from '@/assets/icons/icon_send.svg';
+import SendActiveIcon from '@/assets/icons/icon_send_active.svg';
+import SendInactiveIcon from '@/assets/icons/icon_send_inactive.svg';
 import type { RoleType, MessageType } from '@/pages/Chat/Chat';
 import api from '@/api/axiosInstance';
 import axios from 'axios';
-import { END_ASSISTANT_MESSAGE } from '@/constants/ChatConfig';
 
 type ChatInputBarProp = {
   addMessage: (role: RoleType, content: string, type: MessageType) => void;
   setIsSending: (sending: boolean) => void;
+  isSending: boolean;
 };
 
-const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
+const ChatInputBar = ({
+  addMessage,
+  setIsSending,
+  isSending,
+}: ChatInputBarProp) => {
   const [text, setText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>();
   const [sessionId, setSessionId] = useState<string>();
+  const canSend = (text || imageFile) && !isSending;
 
   const handleSend = async () => {
     if (!(text || imageFile)) return;
@@ -79,7 +84,6 @@ const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
 
       if (data.user_answer) {
         addMessage('assistant', data.user_answer, 'text');
-        addMessage('assistant', END_ASSISTANT_MESSAGE, 'text');
       }
     } catch (err) {
       console.error('채팅 전송 중 오류 발생:', err);
@@ -108,7 +112,7 @@ const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
   };
 
   return (
-    <div className='max-w-app absolute bottom-0 flex w-full flex-col gap-3 bg-white px-4 pt-3 pb-[23px] shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
+    <div className='max-w-app absolute bottom-0 flex w-full flex-col gap-3 bg-white px-4 pt-3 pb-6 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
       {/* 숨겨진 카메라 input */}
       <input
         ref={fileInputRef}
@@ -164,9 +168,9 @@ const ChatInputBar = ({ addMessage, setIsSending }: ChatInputBarProp) => {
         </div>
 
         {/* 전송 버튼 */}
-        <button onClick={handleSend} disabled={!(text || imageFile)}>
+        <button onClick={handleSend} disabled={!canSend}>
           <img
-            src={text || imageFile ? sendIcon : sendDisabledIcon}
+            src={canSend ? SendActiveIcon : SendInactiveIcon}
             alt='send'
             className='h-[38px] w-[38px]'
           />

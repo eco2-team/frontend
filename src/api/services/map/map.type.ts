@@ -7,6 +7,9 @@ export type LocationListRequest = {
   pickup_category?: string;
 };
 
+export type ToggleType = 'all' | SourceType | 'none';
+export type SourceType = 'keco' | 'zerowaste';
+
 export type LocationListItemResponse = {
   id: number;
   name: string;
@@ -17,6 +20,7 @@ export type LocationListItemResponse = {
   distance_km?: number;
   distance_text?: string;
   is_open?: boolean;
+  is_holiday?: boolean;
   start_time?: string;
   end_time?: string;
   phone?: string;

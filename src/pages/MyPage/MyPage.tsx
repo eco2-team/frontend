@@ -8,7 +8,7 @@ import {
 } from '@/constants/UserConfig';
 import { LogoutDialog } from '@/components/myPage/LogoutDialog';
 import { type ProfileLabelType, type UserType } from '@/types/UserTypes';
-import api from '@/api/axiosInstance';
+import { getStorageUserInfo } from '@/util/UserUtil';
 
 const MyPage = () => {
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ const MyPage = () => {
   useEffect(() => {
     const getUserData = async () => {
       try {
-        const { data } = await api.get('/api/v1/user/me');
+        const data = getStorageUserInfo();
         if (!data) return;
         setMenuItems(
           Object.entries(USER_FIELD_MAP).map(([key, value]) => ({
