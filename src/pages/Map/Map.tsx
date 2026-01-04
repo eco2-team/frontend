@@ -9,6 +9,7 @@ import { MapFloatingView } from '@/components/map/MapFloatingView';
 import { MapBottomSheet } from '@/components/map/bottomSheet/MapBottomSheet';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import type { WasteTypeKey } from '@/types/MapTypes';
+import SpinnerIng from '@/assets/icons/spinner_ing.svg';
 
 const Map = () => {
   const location = useLocation();
@@ -16,7 +17,7 @@ const Map = () => {
 
   const kakaoMapRef = useRef<kakao.maps.Map>(null);
 
-  const { userLocation, center, setCenter, error, isLoading } =
+  const { userLocation, center, setCenter, error, isLoading, permissionStatus } =
     useGeolocation();
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -39,12 +40,12 @@ const Map = () => {
     enabled: false, // 자동 실행 방지
   });
 
-  // 초기 데이터 로딩
+  // 위치 정보 로딩 완료 후 초기 데이터 로딩
   useEffect(() => {
-    if (kakaoMapRef.current) {
+    if (!isLoading && kakaoMapRef.current) {
       refetch();
     }
-  }, [kakaoMapRef, refetch]);
+  }, [isLoading, refetch]);
 
   useEffect(() => {
     if (shouldRefetch) {
@@ -151,11 +152,34 @@ const Map = () => {
     });
   }, [data, selectedFilter, selectedId, toggle]);
 
-  if (isLoading) toast.success('위치 정보를 불러오고 있습니다.');
-  if (error) toast.error(error);
+  // 위치 정보 로딩/에러 상태에 따른 토스트 메시지 (useEffect로 한 번만 표시)
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
+  // 로딩 중 오버레이 컴포넌트
+  const LoadingOverlay = () => (
+    <div className='absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm'>
+      <img
+        src={SpinnerIng}
+        alt='loading'
+        className='h-12 w-12 animate-spin'
+      />
+      <p className='mt-4 text-sm text-gray-600'>
+        {permissionStatus === 'prompt'
+          ? '위치 권한을 허용해주세요'
+          : '위치 정보를 불러오는 중...'}
+      </p>
+    </div>
+  );
 
   return (
     <div className='relative h-full w-full overflow-y-hidden'>
+      {/* 로딩 중 오버레이 */}
+      {isLoading && <LoadingOverlay />}
+
       <MapView
         ref={kakaoMapRef}
         data={sortedData}
