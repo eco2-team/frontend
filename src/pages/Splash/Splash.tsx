@@ -9,7 +9,7 @@ const Splash = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data } = await api.get('/api/v1/user/me');
+        const { data } = await api.get('/api/v1/users/me');
 
         if (data && data.username) {
           // 로그인 상태→ 홈 화면으로 이동

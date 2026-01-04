@@ -74,7 +74,7 @@ const CharacterCollection = ({
 
   useEffect(() => {
     const getAcquiredCharacter = async () => {
-      const { data } = await api.get('/api/v1/user/me/characters');
+      const { data } = await api.get('/api/v1/users/me/characters');
       if (!data) {
         console.error('획득한 캐릭터 리스트를 불러올 수 없습니다.');
         return;

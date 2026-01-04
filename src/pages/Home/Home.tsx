@@ -25,7 +25,7 @@ const Home = () => {
     // 항상 서버에서 최신 사용자 정보를 가져옴
     const fetchUser = async () => {
       try {
-        const { data } = await api.get('/api/v1/user/me');
+        const { data } = await api.get('/api/v1/users/me');
         if (!data) return;
 
         const user = data as UserInfoResponse;

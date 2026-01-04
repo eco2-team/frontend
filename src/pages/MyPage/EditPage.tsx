@@ -31,7 +31,7 @@ const EditPage = () => {
     const newNickname = input.trim();
 
     updateStorageNickname(newNickname);
-    await api.patch('/api/v1/user/me', {
+    await api.patch('/api/v1/users/me', {
       [USER_FIELD_MAP[label]]: newNickname,
     });
     navigate(-1);
