@@ -61,7 +61,7 @@ const AppHeader = () => {
         <img
           src={Cancel}
           alt='Cancel'
-          onClick={() => window.location.replace('/home')}
+          onClick={() => navigate('/home', { replace: true })}
           className='h-7.5 w-7.5 cursor-pointer'
         />
       )}
