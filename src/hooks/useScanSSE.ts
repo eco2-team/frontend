@@ -137,10 +137,11 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
         console.log('✅ SSE 연결 성공');
       };
 
-      // SSE 메시지 핸들러
+      // SSE 메시지 핸들러 (unnamed events)
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as ScanSSEEvent;
+          console.log(`📨 SSE 이벤트 수신 [${data.stage}]:`, data);
 
           // Stage → Step 변환
           const step = STAGE_TO_STEP[data.stage] ?? 0;
@@ -148,6 +149,7 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
 
           // 완료 처리
           if (data.stage === 'done') {
+            console.log('🏁 SSE done 이벤트 수신, 결과 조회 시작');
             disconnect();
             // 결과 조회
             ScanService.getScanResult(jobId).then((scanResult) => {
@@ -161,15 +163,17 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
         }
       };
 
-      // 개별 이벤트 리스너 (stage별)
+      // 개별 이벤트 리스너 (stage별 named events)
       ['vision', 'rule', 'answer', 'reward', 'done'].forEach((stage) => {
         eventSource.addEventListener(stage, (event: MessageEvent) => {
           try {
             const data = JSON.parse(event.data) as ScanSSEEvent;
             const step = STAGE_TO_STEP[data.stage] ?? 0;
+            console.log(`📨 SSE [${stage}] 이벤트: step=${step}, progress=${data.progress ?? '-'}%`, data);
             setCurrentStep(step);
 
             if (data.stage === 'done') {
+              console.log('🏁 SSE done 이벤트 수신, 결과 조회 시작');
               disconnect();
               ScanService.getScanResult(jobId).then((scanResult) => {
                 setIsComplete(true);
