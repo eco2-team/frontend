@@ -46,7 +46,7 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
   const [error, setError] = useState<Error | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingAttemptsRef = useRef(0);
   const resultUrlRef = useRef<string | null>(null);
 
