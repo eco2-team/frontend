@@ -143,9 +143,9 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
           const data = JSON.parse(event.data) as ScanSSEEvent;
           console.log(`📨 SSE 이벤트 수신 [${data.stage}]:`, data);
 
-          // Stage → Step 변환
+          // Stage → Step 변환 (역순 방지)
           const step = STAGE_TO_STEP[data.stage] ?? 0;
-          setCurrentStep(step);
+          setCurrentStep((prev) => Math.max(prev, step));
 
           // 완료 처리
           if (data.stage === 'done') {
@@ -170,7 +170,8 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
             const data = JSON.parse(event.data) as ScanSSEEvent;
             const step = STAGE_TO_STEP[data.stage] ?? 0;
             console.log(`📨 SSE [${stage}] 이벤트: step=${step}, progress=${data.progress ?? '-'}%`, data);
-            setCurrentStep(step);
+            // 역순 이벤트 방지: step은 항상 증가만
+            setCurrentStep((prev) => Math.max(prev, step));
 
             if (data.stage === 'done') {
               console.log('🏁 SSE done 이벤트 수신, 결과 조회 시작');
