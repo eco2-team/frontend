@@ -9,6 +9,7 @@ import { RecycleInfoCard } from '@/components/camera/RecycleInfoCard';
 import { RecyclingGuideCard } from '@/components/camera/RecyclingGuideCard';
 import { ResultNavigationBtn } from '@/components/camera/ResultNavigationBtn';
 import { WasteCategoryMap } from '@/types/MapTypes';
+import { isNewCharacter, addOwnedCharacter } from '@/util/CharacterCache';
 
 const Answer = () => {
   const navigate = useNavigate();
@@ -26,10 +27,14 @@ const Answer = () => {
   const resultStatus = reward === null ? 'bad' : 'good';
 
   useEffect(() => {
-    if (resultStatus === 'good' && reward?.received) {
+    // reward가 있고 + 신규 캐릭터일 때만 축하 효과
+    if (reward?.name && isNewCharacter(reward.name)) {
       setShowCelebration(true);
+
+      // Optimistic Update: 로컬 캐시에 즉시 추가
+      addOwnedCharacter(reward.name);
     }
-  }, [resultStatus, reward?.received]);
+  }, [reward?.name]);
 
   if (!pipeline_result) return null;
 
