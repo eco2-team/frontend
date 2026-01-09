@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog } from '@/components/dialog/Dialog';
 import api from '@/api/axiosInstance';
 import { clearStorageUserInfo } from '@/util/UserUtil';
+import { clearOwnedCharacters } from '@/util/CharacterCache';
 
 interface LogoutDialogProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export const LogoutDialog = ({ isOpen, onClose }: LogoutDialogProps) => {
 
       if (data.success) {
         clearStorageUserInfo();
+        clearOwnedCharacters();
         onClose();
         navigate('/login', { replace: true });
       }
