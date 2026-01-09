@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AILoadingVideo from '@/assets/images/mainCharacter/AI_Loading.mp4';
 import { useScanSubmitMutation } from '@/api/services/scan/scan.mutation';
 import { useUploadImageMutation } from '@/api/services/image/image.mutation';
 import { ImageService } from '@/api/services/image/image.service';
-import { ScanService } from '@/api/services/scan/scan.service';
 import { LOADING_STEPS } from '@/constants/AnswerConfig';
 import { LoadingStep } from '@/components/camera/LoadingStep';
 import { useScanSSE } from '@/hooks/useScanSSE';
@@ -15,12 +14,14 @@ const Loading = () => {
   const { imageFile } = location.state;
 
   const [isVisible, setIsVisible] = useState(false);
-  const resultUrlRef = useRef<string | null>(null);
 
-  // SSE 연결 훅
-  const { connect, currentStep, isComplete } = useScanSSE({
-    onError: (error) => {
-      console.error('❌ SSE 연결 실패:', error);
+  // SSE 연결 훅 (폴링 fallback 포함)
+  const { connect, currentStep, isComplete, result, error } = useScanSSE({
+    onComplete: (scanData) => {
+      console.log('✅ 스캔 완료:', scanData);
+    },
+    onError: (err) => {
+      console.error('❌ 스캔 실패:', err);
       navigate('/camera/error', { replace: true });
     },
   });
@@ -35,12 +36,11 @@ const Loading = () => {
   const { mutate: submitScan } = useScanSubmitMutation({
     onSuccess: (data) => {
       console.log('✅ 스캔 작업 제출:', data);
-      resultUrlRef.current = data.result_url;
-      // SSE 연결
-      connect(data.stream_url);
+      // SSE 연결 (실패 시 자동 폴링)
+      connect(data.stream_url, data.result_url);
     },
-    onError: (error) => {
-      console.error('❌ 스캔 제출 실패:', error);
+    onError: (err) => {
+      console.error('❌ 스캔 제출 실패:', err);
       navigate('/camera/error', { replace: true });
     },
   });
@@ -56,8 +56,8 @@ const Loading = () => {
       // POST /scan 요청
       submitScan({ image_url: data.cdn_url });
     },
-    onError: (error) => {
-      console.error('❌ 이미지 업로드 실패:', error);
+    onError: (err) => {
+      console.error('❌ 이미지 업로드 실패:', err);
       navigate('/camera/error', { replace: true });
     },
   });
@@ -75,38 +75,30 @@ const Loading = () => {
     });
   }, [imageFile, uploadImage]);
 
-  // SSE 완료 시 결과 조회 및 페이지 이동
+  // 완료 시 Answer 페이지로 이동
   useEffect(() => {
-    if (!isComplete || !resultUrlRef.current) return;
+    if (!isComplete || !result) return;
 
-    const fetchResult = async () => {
-      try {
-        // result_url에서 job_id 추출
-        const jobId = resultUrlRef.current!.split('/').pop()?.replace('/result', '') || '';
-        const scanData = await ScanService.getScanResult(jobId);
+    if (!result.pipeline_result) {
+      navigate('/camera/error', { replace: true });
+      return;
+    }
 
-        console.log('✅ 스캔 결과 조회:', scanData);
+    navigate('/camera/answer', {
+      state: {
+        imageFile,
+        data: result,
+      },
+      replace: true,
+    });
+  }, [isComplete, result, navigate, imageFile]);
 
-        if (!scanData.pipeline_result) {
-          navigate('/camera/error', { replace: true });
-          return;
-        }
-
-        navigate('/camera/answer', {
-          state: {
-            imageFile,
-            data: scanData,
-          },
-          replace: true,
-        });
-      } catch (error) {
-        console.error('❌ 결과 조회 실패:', error);
-        navigate('/camera/error', { replace: true });
-      }
-    };
-
-    fetchResult();
-  }, [isComplete, navigate, imageFile]);
+  // 에러 발생 시 에러 페이지로 이동
+  useEffect(() => {
+    if (error) {
+      navigate('/camera/error', { replace: true });
+    }
+  }, [error, navigate]);
 
   return (
     <div
