@@ -32,11 +32,10 @@ export type ScanClassifyResponse = {
     };
   };
   reward?: {
-    received: string;
-    already_owned: boolean;
     name: string;
     dialog: string;
     match_reason: string;
+    type: string;
   };
   error?: string;
 };
