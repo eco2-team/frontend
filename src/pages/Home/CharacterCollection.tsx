@@ -6,6 +6,7 @@ import type {
   CharacterNames,
   CharacterType,
 } from '@/types/CharacterInfoTypes';
+import { setOwnedCharacters } from '@/util/CharacterCache';
 import { useEffect, useState } from 'react';
 
 type CharacterCollectionProps = {
@@ -81,6 +82,9 @@ const CharacterCollection = ({
       }
       const names = data.map((item: MyCharacterResponse) => item.name);
       setAcquiredList(names);
+
+      // localStorage 캐시 동기화
+      setOwnedCharacters(names);
     };
     getAcquiredCharacter();
   }, []);
