@@ -1,20 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AILoadingVideo from '@/assets/images/mainCharacter/AI_Loading.mp4';
-import { useScanClassifyMutation } from '@/api/services/scan/scan.mutation';
+import { useScanSubmitMutation } from '@/api/services/scan/scan.mutation';
 import { useUploadImageMutation } from '@/api/services/image/image.mutation';
 import { ImageService } from '@/api/services/image/image.service';
+import { ScanService } from '@/api/services/scan/scan.service';
 import { LOADING_STEPS } from '@/constants/AnswerConfig';
 import { LoadingStep } from '@/components/camera/LoadingStep';
-import { useLoadingSteps } from '@/hooks/useLoadingSteps';
+import { useScanSSE } from '@/hooks/useScanSSE';
 
 const Loading = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { imageFile } = location.state;
 
-  const { currentStep, minTimeElapsed } = useLoadingSteps();
   const [isVisible, setIsVisible] = useState(false);
+  const resultUrlRef = useRef<string | null>(null);
+
+  // SSE 연결 훅
+  const { connect, currentStep, isComplete } = useScanSSE({
+    onError: (error) => {
+      console.error('❌ SSE 연결 실패:', error);
+      navigate('/camera/error', { replace: true });
+    },
+  });
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -22,19 +31,21 @@ const Loading = () => {
     });
   }, []);
 
-  const {
-    mutate: classifyScan,
-    data: scanData,
-    isSuccess: isScanComplete,
-  } = useScanClassifyMutation({
+  // POST /scan 요청
+  const { mutate: submitScan } = useScanSubmitMutation({
     onSuccess: (data) => {
-      console.log('✅ 스캔 분류 완료:', data);
+      console.log('✅ 스캔 작업 제출:', data);
+      resultUrlRef.current = data.result_url;
+      // SSE 연결
+      connect(data.stream_url);
     },
     onError: (error) => {
-      console.error('❌ 스캔 분류 실패:', error);
+      console.error('❌ 스캔 제출 실패:', error);
+      navigate('/camera/error', { replace: true });
     },
   });
 
+  // 이미지 업로드
   const { mutate: uploadImage } = useUploadImageMutation({
     onSuccess: async (data) => {
       const response = await ImageService.putUploadImageUDN(
@@ -42,13 +53,16 @@ const Loading = () => {
         imageFile,
       );
       console.log('📤 CDN 업로드 성공:', response);
-      classifyScan({ image_url: data.cdn_url });
+      // POST /scan 요청
+      submitScan({ image_url: data.cdn_url });
     },
     onError: (error) => {
       console.error('❌ 이미지 업로드 실패:', error);
+      navigate('/camera/error', { replace: true });
     },
   });
 
+  // 이미지 업로드 시작
   useEffect(() => {
     if (!imageFile) return;
 
@@ -61,22 +75,38 @@ const Loading = () => {
     });
   }, [imageFile, uploadImage]);
 
+  // SSE 완료 시 결과 조회 및 페이지 이동
   useEffect(() => {
-    if (!minTimeElapsed || !isScanComplete) return;
+    if (!isComplete || !resultUrlRef.current) return;
 
-    // API 완료 및 최소 대기 시간 경과 시 다음 페이지로 이동
-    if (!scanData.pipeline_result) {
-      navigate('/camera/error', { replace: true });
-      return;
-    }
-    navigate('/camera/answer', {
-      state: {
-        imageFile,
-        data: scanData,
-      },
-      replace: true,
-    });
-  }, [minTimeElapsed, isScanComplete, scanData, navigate, imageFile]);
+    const fetchResult = async () => {
+      try {
+        // result_url에서 job_id 추출
+        const jobId = resultUrlRef.current!.split('/').pop()?.replace('/result', '') || '';
+        const scanData = await ScanService.getScanResult(jobId);
+
+        console.log('✅ 스캔 결과 조회:', scanData);
+
+        if (!scanData.pipeline_result) {
+          navigate('/camera/error', { replace: true });
+          return;
+        }
+
+        navigate('/camera/answer', {
+          state: {
+            imageFile,
+            data: scanData,
+          },
+          replace: true,
+        });
+      } catch (error) {
+        console.error('❌ 결과 조회 실패:', error);
+        navigate('/camera/error', { replace: true });
+      }
+    };
+
+    fetchResult();
+  }, [isComplete, navigate, imageFile]);
 
   return (
     <div
@@ -107,7 +137,7 @@ const Loading = () => {
             <LoadingStep
               key={index}
               text={text}
-              isComplete={currentStep > index + 1}
+              isComplete={currentStep > index}
             />
           ))}
         </div>
