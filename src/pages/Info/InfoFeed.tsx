@@ -36,24 +36,24 @@ const InfoFeed = () => {
       </header>
 
       {/* Category Tabs */}
-      <div
+      <nav
         ref={tabsRef}
-        className='no-scrollbar flex gap-2 overflow-x-auto px-5 pb-3'
+        className='no-scrollbar flex justify-center gap-8 overflow-x-auto px-5 pb-3'
       >
         {CATEGORIES.map((category) => (
           <button
             key={category.id}
             onClick={() => setSelectedCategory(category.id)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 text-sm transition-colors ${
               selectedCategory === category.id
-                ? 'bg-brand-primary text-white'
-                : 'bg-gray-100 text-text-secondary hover:bg-gray-200'
+                ? 'font-semibold text-brand-primary'
+                : 'font-normal text-text-inactive hover:text-text-secondary'
             }`}
           >
             {category.label}
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* News Feed */}
       <div className='flex-1 overflow-y-auto bg-inactive'>
