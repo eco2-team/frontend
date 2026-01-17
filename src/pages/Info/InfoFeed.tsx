@@ -38,13 +38,13 @@ const InfoFeed = () => {
       {/* Category Tabs */}
       <nav
         ref={tabsRef}
-        className='no-scrollbar flex justify-center gap-8 overflow-x-auto px-5 pb-3'
+        className='no-scrollbar flex justify-center gap-10 overflow-x-auto px-5 pb-3'
       >
         {CATEGORIES.map((category) => (
           <button
             key={category.id}
             onClick={() => setSelectedCategory(category.id)}
-            className={`shrink-0 text-sm transition-colors ${
+            className={`shrink-0 text-base transition-colors ${
               selectedCategory === category.id
                 ? 'font-semibold text-brand-primary'
                 : 'font-normal text-text-inactive hover:text-text-secondary'
