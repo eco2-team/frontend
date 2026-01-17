@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { NewsFeed } from '@/components/info/NewsFeed';
 import GoBack from '@/assets/icons/go_back.svg';
 
@@ -12,10 +12,26 @@ const CATEGORIES = [
 
 type CategoryId = (typeof CATEGORIES)[number]['id'];
 
+const isValidCategory = (value: string | null): value is CategoryId => {
+  return CATEGORIES.some((c) => c.id === value);
+};
+
 const InfoFeed = () => {
   const navigate = useNavigate();
-  const [selectedCategory, setSelectedCategory] = useState<CategoryId>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabsRef = useRef<HTMLDivElement>(null);
+
+  const categoryParam = searchParams.get('category');
+  const selectedCategory: CategoryId = isValidCategory(categoryParam)
+    ? categoryParam
+    : 'all';
+
+  const handleCategoryChange = (categoryId: CategoryId) => {
+    setSearchParams(
+      categoryId === 'all' ? {} : { category: categoryId },
+      { replace: true }
+    );
+  };
 
   const handleGoBack = () => {
     navigate(-1);
@@ -43,7 +59,7 @@ const InfoFeed = () => {
         {CATEGORIES.map((category) => (
           <button
             key={category.id}
-            onClick={() => setSelectedCategory(category.id)}
+            onClick={() => handleCategoryChange(category.id)}
             className={`shrink-0 text-base transition-colors ${
               selectedCategory === category.id
                 ? 'font-semibold text-brand-primary'
