@@ -1,7 +1,6 @@
 import { useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { NewsFeed } from '@/components/info/NewsFeed';
-import GoBack from '@/assets/icons/go_back.svg';
 
 const CATEGORIES = [
   { id: 'all', label: '전체' },
@@ -17,7 +16,6 @@ const isValidCategory = (value: string | null): value is CategoryId => {
 };
 
 const InfoFeed = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -33,22 +31,11 @@ const InfoFeed = () => {
     );
   };
 
-  const handleGoBack = () => {
-    navigate(-1);
-  };
-
   return (
     <main className='no-scrollbar max-w-app relative flex h-full flex-col overflow-hidden bg-white'>
       {/* Header */}
-      <header className='flex items-center justify-between px-5 pt-4 pb-3'>
-        <button
-          onClick={handleGoBack}
-          className='flex h-10 w-10 items-center justify-center'
-        >
-          <img src={GoBack} alt='뒤로가기' className='h-7 w-7' />
-        </button>
-        <h1 className='text-lg font-bold text-text-primary'>News</h1>
-        <div className='h-10 w-10' />
+      <header className='px-5 pt-4 pb-3'>
+        <h1 className='text-center text-lg font-bold text-text-primary'>News</h1>
       </header>
 
       {/* Category Tabs */}
