@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { NewsFeed } from '@/components/info/NewsFeed';
 
@@ -15,20 +15,55 @@ const isValidCategory = (value: string | null): value is CategoryId => {
   return CATEGORIES.some((c) => c.id === value);
 };
 
+const SWIPE_THRESHOLD = 50;
+
 const InfoFeed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabsRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
   const categoryParam = searchParams.get('category');
   const selectedCategory: CategoryId = isValidCategory(categoryParam)
     ? categoryParam
     : 'all';
 
-  const handleCategoryChange = (categoryId: CategoryId) => {
-    setSearchParams(
-      categoryId === 'all' ? {} : { category: categoryId },
-      { replace: true }
-    );
+  const currentIndex = CATEGORIES.findIndex((c) => c.id === selectedCategory);
+
+  const handleCategoryChange = useCallback(
+    (categoryId: CategoryId) => {
+      setSearchParams(
+        categoryId === 'all' ? {} : { category: categoryId },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const handleSwipe = useCallback(() => {
+    const diff = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(diff) < SWIPE_THRESHOLD) return;
+
+    if (diff > 0 && currentIndex < CATEGORIES.length - 1) {
+      // 왼쪽으로 스와이프 → 다음 카테고리
+      handleCategoryChange(CATEGORIES[currentIndex + 1].id);
+    } else if (diff < 0 && currentIndex > 0) {
+      // 오른쪽으로 스와이프 → 이전 카테고리
+      handleCategoryChange(CATEGORIES[currentIndex - 1].id);
+    }
+  }, [currentIndex, handleCategoryChange]);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    handleSwipe();
   };
 
   return (
@@ -58,8 +93,13 @@ const InfoFeed = () => {
         ))}
       </nav>
 
-      {/* News Feed */}
-      <div className='flex-1 overflow-y-auto bg-inactive'>
+      {/* News Feed with Swipe */}
+      <div
+        className='flex-1 overflow-y-auto bg-inactive'
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
         <NewsFeed
           key={selectedCategory}
           category={selectedCategory === 'all' ? undefined : selectedCategory}
