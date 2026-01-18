@@ -16,12 +16,14 @@ const isValidCategory = (value: string | null): value is CategoryId => {
 };
 
 const SWIPE_THRESHOLD = 50;
+const EDGE_THRESHOLD = 30; // 화면 가장자리 감지 (브라우저 뒤로가기 제스처 영역)
 
 const InfoFeed = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabsRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+  const isEdgeSwipe = useRef<boolean>(false);
 
   const categoryParam = searchParams.get('category');
   const selectedCategory: CategoryId = isValidCategory(categoryParam)
@@ -41,6 +43,9 @@ const InfoFeed = () => {
   );
 
   const handleSwipe = useCallback(() => {
+    // 화면 가장자리에서 시작한 스와이프는 무시 (브라우저 뒤로가기 제스처)
+    if (isEdgeSwipe.current) return;
+
     const diff = touchStartX.current - touchEndX.current;
 
     if (Math.abs(diff) < SWIPE_THRESHOLD) return;
@@ -55,7 +60,11 @@ const InfoFeed = () => {
   }, [currentIndex, handleCategoryChange]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
+    const startX = e.touches[0].clientX;
+    touchStartX.current = startX;
+    // 화면 왼쪽/오른쪽 가장자리에서 시작하면 브라우저 제스처로 판단
+    isEdgeSwipe.current =
+      startX < EDGE_THRESHOLD || startX > window.innerWidth - EDGE_THRESHOLD;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
