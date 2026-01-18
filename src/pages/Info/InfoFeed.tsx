@@ -54,7 +54,7 @@ const InfoFeed = () => {
       </nav>
 
       {/* News Feed */}
-      <div className='flex-1 overflow-y-auto bg-inactive'>
+      <div className='flex-1 overflow-hidden bg-inactive'>
         <NewsFeed
           key={selectedCategory}
           category={selectedCategory === 'all' ? undefined : selectedCategory}
