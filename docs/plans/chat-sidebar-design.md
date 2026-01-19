@@ -845,5 +845,92 @@ const Chat = () => {
 
 ---
 
+## 10. 세션 자동 생성 흐름
+
+세션이 없는 상태에서 사용자가 메시지를 입력하면 **프론트엔드에서 순차 호출**로 처리합니다.
+
+### 10.1 흐름
+
+```
+[사용자] 첫 메시지 입력 ("페트병 버리는 법")
+    │
+    ▼
+[프론트엔드] currentChatId === null?
+    │
+    ├─ Yes ─► POST /api/v1/chat     ← 세션 생성
+    │              │
+    │              ▼
+    │         { id: "abc-123", title: null, ... }
+    │              │
+    │         setCurrentChatId("abc-123")
+    │              │
+    ▼              ▼
+POST /api/v1/chat/abc-123/messages   ← 메시지 전송
+    │
+    ▼
+{ job_id: "...", stream_url: "/sse/..." }
+    │
+    ▼
+EventSource(stream_url)              ← SSE 연결
+```
+
+### 10.2 구현 코드
+
+```typescript
+// hooks/useChatStream.ts 또는 Chat.tsx
+
+const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
+const handleSend = async (text: string, imageUrl?: string) => {
+  let chatId = currentChatId;
+
+  // 1. 세션이 없으면 먼저 생성
+  if (!chatId) {
+    const newChat = await ChatService.createChat();
+    chatId = newChat.id;
+    setCurrentChatId(chatId);
+
+    // 사이드바 목록 갱신
+    queryClient.invalidateQueries({ queryKey: ['chat', 'list'] });
+  }
+
+  // 2. 사용자 메시지 UI에 즉시 추가
+  addUserMessage(text);
+  if (imageUrl) addUserMessage(imageUrl, 'image');
+
+  // 3. 메시지 전송 + SSE 연결
+  const { job_id, stream_url } = await ChatService.submitMessage(chatId, {
+    message: text,
+    image_url: imageUrl,
+  });
+
+  connectSSE(stream_url);
+};
+```
+
+### 10.3 세션 제목 자동 설정
+
+백엔드에서 첫 메시지 저장 시 `preview` 필드가 자동 업데이트됩니다:
+
+```sql
+-- conversations.preview = 첫 메시지 내용 (100자 제한)
+UPDATE chat.conversations
+SET preview = LEFT(message_content, 100),
+    last_message_at = NOW()
+WHERE id = chat_id;
+```
+
+사이드바에서는 `title || preview || '새 대화'` 순서로 표시합니다.
+
+### 10.4 UX 고려사항
+
+| 상황 | 처리 |
+|------|------|
+| 세션 생성 실패 | 에러 토스트, 재시도 버튼 표시 |
+| 메시지 전송 실패 | 세션은 유지, 메시지만 재전송 UI |
+| 네트워크 끊김 | 세션 ID는 로컬 저장 (새로고침 대비) |
+
+---
+
 **작성일**: 2026-01-19
 **상태**: 설계 완료
