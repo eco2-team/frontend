@@ -3,6 +3,40 @@
  */
 
 // ============================================================
+// 모델 선택
+// ============================================================
+
+/** LLM Provider */
+export type LLMProvider = 'openai' | 'google';
+
+/** 모델 옵션 */
+export interface ModelOption {
+  id: string;
+  provider: LLMProvider;
+  label: string;
+  description?: string;
+}
+
+/** 사용 가능한 모델 목록 */
+export const AVAILABLE_MODELS: ModelOption[] = [
+  {
+    id: 'gpt-5.2',
+    provider: 'openai',
+    label: 'GPT-5.2',
+    description: '빠르고 정확한 응답',
+  },
+  {
+    id: 'gemini-3-flash-preview',
+    provider: 'google',
+    label: 'Gemini 3 Flash',
+    description: '빠른 멀티모달 처리',
+  },
+];
+
+/** 기본 모델 */
+export const DEFAULT_MODEL = AVAILABLE_MODELS[0];
+
+// ============================================================
 // 위치 정보
 // ============================================================
 

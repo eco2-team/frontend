@@ -2,13 +2,14 @@
  * Agent 메인 컨테이너
  * - 사이드바 + 라이트 테마 메인 영역
  * - 메시지 큐 지원 (스트리밍 중 입력 메시지 대기)
+ * - 모델 선택 지원
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, ChevronDown } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AgentService } from '@/api/services/agent';
-import type { ChatSummary } from '@/api/services/agent';
+import { AgentService, AVAILABLE_MODELS } from '@/api/services/agent';
+import type { ChatSummary, ModelOption } from '@/api/services/agent';
 import { useAgentChat, useMessageQueue } from '@/hooks/agent';
 import type { QueuedMessage } from '@/hooks/agent/useMessageQueue';
 import { AgentSidebar } from './sidebar';
@@ -18,6 +19,7 @@ import { AgentMessageQueue } from './AgentMessageQueue';
 
 export const AgentContainer = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // 이전 스트리밍 상태 추적 (큐 처리용)
@@ -34,6 +36,8 @@ export const AgentContainer = () => {
     hasMoreHistory,
     currentChat,
     setCurrentChat,
+    selectedModel,
+    setSelectedModel,
     sendMessage,
     regenerateMessage,
     stopGeneration,
@@ -47,6 +51,15 @@ export const AgentContainer = () => {
     loadChatMessages,
     clearMessages,
   } = useAgentChat();
+
+  // 모델 선택 핸들러
+  const handleModelSelect = useCallback(
+    (model: ModelOption) => {
+      setSelectedModel(model);
+      setModelDropdownOpen(false);
+    },
+    [setSelectedModel],
+  );
 
   // 메시지 큐
   const { queuedMessages, enqueue, remove, dequeue } = useMessageQueue();
@@ -162,15 +175,58 @@ export const AgentContainer = () => {
 
       {/* 헤더 */}
       <header className='border-stroke-default flex items-center justify-between border-b bg-white px-4 py-3'>
-        <h1 className='text-text-primary text-base font-semibold'>
-          {currentChat?.title || '이코와 대화'}
-        </h1>
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className='text-text-primary rounded p-2 transition-colors hover:bg-gray-100'
-        >
-          <Menu className='h-5 w-5' />
-        </button>
+        {/* 모델 선택 드롭다운 */}
+        <div className='relative'>
+          <button
+            onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+            className='flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100'
+          >
+            {selectedModel.label}
+            <ChevronDown className='h-4 w-4' />
+          </button>
+
+          {modelDropdownOpen && (
+            <>
+              <div
+                className='fixed inset-0 z-10'
+                onClick={() => setModelDropdownOpen(false)}
+              />
+              <div className='absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg'>
+                {AVAILABLE_MODELS.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => handleModelSelect(model)}
+                    className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
+                      selectedModel.id === model.id ? 'bg-gray-50' : ''
+                    }`}
+                  >
+                    <span className='text-sm font-medium text-gray-900'>
+                      {model.label}
+                    </span>
+                    {model.description && (
+                      <span className='text-xs text-gray-500'>
+                        {model.description}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 타이틀 + 메뉴 */}
+        <div className='flex items-center gap-2'>
+          <h1 className='text-text-primary text-sm font-medium'>
+            {currentChat?.title || '새 대화'}
+          </h1>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className='text-text-primary rounded p-2 transition-colors hover:bg-gray-100'
+          >
+            <Menu className='h-5 w-5' />
+          </button>
+        </div>
       </header>
 
       {/* 메시지 리스트 */}

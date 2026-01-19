@@ -2,6 +2,7 @@
  * Agent 채팅 통합 훅
  * - Race condition 방지 (isSendingRef)
  * - 언마운트 후 상태 업데이트 방지
+ * - 모델 선택 지원
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -11,8 +12,10 @@ import type {
   ChatSummary,
   CurrentStage,
   DoneEvent,
+  ModelOption,
   SendMessageRequest,
 } from '@/api/services/agent';
+import { DEFAULT_MODEL } from '@/api/services/agent';
 import { useAgentSSE } from './useAgentSSE';
 import { useAgentLocation } from './useAgentLocation';
 import { useImageUpload } from './useImageUpload';
@@ -36,6 +39,10 @@ interface UseAgentChatReturn {
   // 현재 채팅
   currentChat: ChatSummary | null;
   setCurrentChat: (chat: ChatSummary | null) => void;
+
+  // 모델 선택
+  selectedModel: ModelOption;
+  setSelectedModel: (model: ModelOption) => void;
 
   // 메시지 액션
   sendMessage: (message: string) => Promise<void>;
@@ -68,6 +75,7 @@ export const useAgentChat = (
   // 상태
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [currentChat, setCurrentChat] = useState<ChatSummary | null>(null);
+  const [selectedModel, setSelectedModel] = useState<ModelOption>(DEFAULT_MODEL);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [hasMoreHistory, setHasMoreHistory] = useState(false);
@@ -220,6 +228,7 @@ export const useAgentChat = (
           message,
           image_url: finalImageUrl,
           user_location: userLocation,
+          model: selectedModel.id,
         };
 
         // 메시지 전송
@@ -244,6 +253,7 @@ export const useAgentChat = (
     },
     [
       selectedImage,
+      selectedModel,
       userLocation,
       createNewChat,
       uploadImage,
@@ -362,6 +372,10 @@ export const useAgentChat = (
     // 현재 채팅
     currentChat,
     setCurrentChat,
+
+    // 모델 선택
+    selectedModel,
+    setSelectedModel,
 
     // 메시지 액션
     sendMessage,
