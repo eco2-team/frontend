@@ -932,5 +932,500 @@ WHERE id = chat_id;
 
 ---
 
+## 11. 새 채팅 생성 애니메이션 (Claude 스타일)
+
+새 채팅 생성 시 사이드바에서 보여지는 UX 애니메이션을 상세히 설계합니다.
+
+### 11.1 상태 전이 흐름
+
+```
+[사용자 메시지 입력]
+       │
+       ▼
+┌─────────────────────────────────┐
+│ State 1: CREATING               │
+│ ─────────────────────────────── │
+│ 💬 New Chat ◌ (프로그레스 링)    │  ← 사이드바 상단에 즉시 추가
+│    ↑ 새로 추가됨                 │
+│ 💬 이전 대화...            3d   │
+│ 💬 또 다른 대화...          4d   │
+└─────────────────────────────────┘
+       │
+       │ (SSE 연결, 응답 대기중)
+       ▼
+┌─────────────────────────────────┐
+│ State 2: STREAMING              │
+│ ─────────────────────────────── │
+│ 💬 New Chat ◌ (프로그레스 링)    │  ← 여전히 로딩 중
+│ 💬 이전 대화...            3d   │
+└─────────────────────────────────┘
+       │
+       │ (done 이벤트 수신 - 제목 생성)
+       ▼
+┌─────────────────────────────────┐
+│ State 3: TITLE_ANIMATING        │
+│ ─────────────────────────────── │
+│ 💬 페트병 분리배█               │  ← 타이핑 애니메이션
+│ 💬 이전 대화...            3d   │
+└─────────────────────────────────┘
+       │
+       │ (애니메이션 완료)
+       ▼
+┌─────────────────────────────────┐
+│ State 4: COMPLETE               │
+│ ─────────────────────────────── │
+│ 💬 페트병 분리배출 방법...  방금  │  ← 최종 상태
+│ 💬 이전 대화...            3d   │
+└─────────────────────────────────┘
+```
+
+### 11.2 ChatSidebarItem 상태 타입
+
+```typescript
+// types/chat-sidebar.ts
+
+export type ChatItemStatus =
+  | 'idle'              // 일반 상태
+  | 'creating'          // 생성 중 (API 호출)
+  | 'streaming'         // 응답 스트리밍 중
+  | 'title_animating'   // 제목 타이핑 애니메이션 중
+  | 'complete';         // 완료
+
+export interface ChatSidebarItem {
+  id: string;
+  title: string;                  // "New Chat" → "페트병 분리배출..."
+  preview: string | null;
+  messageCount: number;
+  lastMessageAt: Date | null;
+  createdAt: Date;
+
+  // 애니메이션 상태
+  status: ChatItemStatus;
+  animatingTitle?: string;        // 타이핑 중인 제목 (부분 문자열)
+}
+```
+
+### 11.3 ChatSidebarItem 컴포넌트 (애니메이션 지원)
+
+```typescript
+// components/chat/ChatSidebar/ChatSidebarItem.tsx
+
+import { useEffect, useState } from 'react';
+import { formatRelativeTime } from '@/utils/formatRelativeTime';
+import { MessageIcon, SpinnerIcon } from '@/assets/icons';
+import type { ChatSidebarItem as ChatSidebarItemType } from '@/types/chat-sidebar';
+
+interface ChatSidebarItemProps {
+  item: ChatSidebarItemType;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+export const ChatSidebarItem = ({
+  item,
+  isActive,
+  onClick,
+}: ChatSidebarItemProps) => {
+  const isLoading = item.status === 'creating' || item.status === 'streaming';
+  const isAnimating = item.status === 'title_animating';
+
+  // 표시할 제목 결정
+  const displayTitle = isAnimating
+    ? item.animatingTitle || ''
+    : item.title;
+
+  const relativeTime = formatRelativeTime(item.lastMessageAt || item.createdAt);
+
+  return (
+    <button
+      onClick={onClick}
+      className={`group flex w-full items-center gap-3 rounded-lg p-3 text-left transition-all duration-200 ${
+        isActive
+          ? 'bg-[#333] text-white'
+          : 'text-[#ccc] hover:bg-[#2a2a2a] hover:text-white'
+      } ${item.status === 'creating' ? 'animate-slide-in' : ''}`}
+    >
+      {/* 아이콘 */}
+      <MessageIcon className="h-5 w-5 flex-shrink-0 text-[#666]" />
+
+      {/* 제목 + 타이핑 커서 */}
+      <span className="flex-1 truncate text-sm">
+        {displayTitle}
+        {isAnimating && (
+          <span className="animate-pulse text-[#888]">▊</span>
+        )}
+      </span>
+
+      {/* 로딩 스피너 또는 시간 */}
+      {isLoading ? (
+        <SpinnerIcon className="h-4 w-4 flex-shrink-0 animate-spin text-[#666]" />
+      ) : (
+        <span className="flex-shrink-0 text-xs text-[#666]">
+          {relativeTime}
+        </span>
+      )}
+    </button>
+  );
+};
+```
+
+### 11.4 타이핑 애니메이션 Hook
+
+```typescript
+// hooks/useTypingAnimation.ts
+
+import { useState, useEffect, useCallback } from 'react';
+
+interface UseTypingAnimationOptions {
+  text: string;
+  speed?: number;           // ms per character (default: 30)
+  startDelay?: number;      // 시작 전 딜레이 (default: 0)
+  onComplete?: () => void;
+}
+
+interface UseTypingAnimationReturn {
+  displayText: string;
+  isAnimating: boolean;
+  start: () => void;
+  reset: () => void;
+}
+
+export const useTypingAnimation = ({
+  text,
+  speed = 30,
+  startDelay = 0,
+  onComplete,
+}: UseTypingAnimationOptions): UseTypingAnimationReturn => {
+  const [displayText, setDisplayText] = useState('');
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [charIndex, setCharIndex] = useState(0);
+
+  const start = useCallback(() => {
+    setDisplayText('');
+    setCharIndex(0);
+    setIsAnimating(true);
+  }, []);
+
+  const reset = useCallback(() => {
+    setDisplayText('');
+    setCharIndex(0);
+    setIsAnimating(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isAnimating) return;
+
+    // 시작 딜레이
+    if (charIndex === 0 && startDelay > 0) {
+      const delayTimer = setTimeout(() => {
+        setCharIndex(1);
+      }, startDelay);
+      return () => clearTimeout(delayTimer);
+    }
+
+    // 타이핑 완료
+    if (charIndex >= text.length) {
+      setIsAnimating(false);
+      setDisplayText(text);
+      onComplete?.();
+      return;
+    }
+
+    // 한 글자씩 추가
+    const timer = setTimeout(() => {
+      setDisplayText(text.slice(0, charIndex + 1));
+      setCharIndex((prev) => prev + 1);
+    }, speed);
+
+    return () => clearTimeout(timer);
+  }, [isAnimating, charIndex, text, speed, startDelay, onComplete]);
+
+  return { displayText, isAnimating, start, reset };
+};
+```
+
+### 11.5 사이드바 상태 관리 (새 채팅 애니메이션)
+
+```typescript
+// hooks/useChatSidebar.ts (확장)
+
+import { useState, useCallback } from 'react';
+import { useTypingAnimation } from './useTypingAnimation';
+import type { ChatSidebarItem, ChatItemStatus } from '@/types/chat-sidebar';
+
+export const useChatSidebar = () => {
+  const [chats, setChats] = useState<ChatSidebarItem[]>([]);
+  const [newChatId, setNewChatId] = useState<string | null>(null);
+
+  /**
+   * 새 채팅 생성 시작 - "New Chat" + 로딩 상태로 상단에 추가
+   */
+  const startNewChat = useCallback((chatId: string) => {
+    const newChat: ChatSidebarItem = {
+      id: chatId,
+      title: 'New Chat',
+      preview: null,
+      messageCount: 0,
+      lastMessageAt: null,
+      createdAt: new Date(),
+      status: 'creating',
+    };
+
+    // 상단에 추가 (애니메이션과 함께)
+    setChats((prev) => [newChat, ...prev]);
+    setNewChatId(chatId);
+  }, []);
+
+  /**
+   * 스트리밍 시작 - 상태 변경
+   */
+  const setStreaming = useCallback((chatId: string) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId ? { ...chat, status: 'streaming' } : chat
+      )
+    );
+  }, []);
+
+  /**
+   * 응답 완료 - 제목 애니메이션 시작
+   */
+  const setTitleWithAnimation = useCallback(
+    (chatId: string, title: string) => {
+      // 1. 타이핑 애니메이션 상태로 변경
+      setChats((prev) =>
+        prev.map((chat) =>
+          chat.id === chatId
+            ? { ...chat, status: 'title_animating', title, animatingTitle: '' }
+            : chat
+        )
+      );
+
+      // 2. 타이핑 애니메이션 (30ms per char)
+      let charIndex = 0;
+      const interval = setInterval(() => {
+        charIndex++;
+        if (charIndex > title.length) {
+          clearInterval(interval);
+          // 애니메이션 완료
+          setChats((prev) =>
+            prev.map((chat) =>
+              chat.id === chatId
+                ? { ...chat, status: 'complete', animatingTitle: undefined }
+                : chat
+            )
+          );
+          setNewChatId(null);
+          return;
+        }
+
+        setChats((prev) =>
+          prev.map((chat) =>
+            chat.id === chatId
+              ? { ...chat, animatingTitle: title.slice(0, charIndex) }
+              : chat
+          )
+        );
+      }, 30);
+    },
+    []
+  );
+
+  /**
+   * 에러 발생 - 로딩 상태 해제
+   */
+  const setError = useCallback((chatId: string) => {
+    setChats((prev) =>
+      prev.map((chat) =>
+        chat.id === chatId
+          ? { ...chat, status: 'idle', title: 'New Chat (오류)' }
+          : chat
+      )
+    );
+    setNewChatId(null);
+  }, []);
+
+  return {
+    chats,
+    newChatId,
+    startNewChat,
+    setStreaming,
+    setTitleWithAnimation,
+    setError,
+    // ... 기존 메서드들
+  };
+};
+```
+
+### 11.6 Chat 페이지 통합
+
+```typescript
+// pages/Chat/Chat.tsx (핵심 부분)
+
+const Chat = () => {
+  const {
+    chats,
+    startNewChat,
+    setStreaming,
+    setTitleWithAnimation,
+    setError,
+  } = useChatSidebar();
+
+  const handleSend = async (text: string, imageUrl?: string) => {
+    let chatId = currentChatId;
+
+    // 1. 세션이 없으면 새로 생성
+    if (!chatId) {
+      const newChat = await ChatService.createChat();
+      chatId = newChat.id;
+      setCurrentChatId(chatId);
+
+      // 🎬 사이드바에 "New Chat" + 로딩 상태로 추가
+      startNewChat(chatId);
+    }
+
+    // 2. 메시지 전송
+    const { job_id, stream_url } = await ChatService.submitMessage(chatId, {
+      message: text,
+      image_url: imageUrl,
+    });
+
+    // 🎬 스트리밍 상태로 변경
+    setStreaming(chatId);
+
+    // 3. SSE 연결
+    const eventSource = new EventSource(stream_url);
+
+    eventSource.addEventListener('done', (e) => {
+      const data = JSON.parse(e.data);
+      const answer = data.result?.answer || '';
+
+      // 🎬 제목 생성 및 타이핑 애니메이션
+      // 첫 메시지를 기반으로 제목 생성 (30자 제한)
+      const title = generateTitle(text, answer);
+      setTitleWithAnimation(chatId, title);
+
+      eventSource.close();
+    });
+
+    eventSource.addEventListener('error', () => {
+      setError(chatId);
+      eventSource.close();
+    });
+  };
+
+  // ...
+};
+
+/**
+ * 대화 제목 생성 (첫 질문 기반)
+ */
+function generateTitle(userMessage: string, _answer?: string): string {
+  // 방법 1: 첫 질문 자체를 제목으로 (단순)
+  const maxLength = 25;
+  if (userMessage.length <= maxLength) {
+    return userMessage;
+  }
+  return userMessage.slice(0, maxLength - 3) + '...';
+
+  // 방법 2: 백엔드에서 LLM으로 요약 제목 생성 (고급)
+  // return await ChatService.generateTitle(chatId);
+}
+```
+
+### 11.7 CSS 애니메이션
+
+```css
+/* styles/animations.css 또는 tailwind.config.js */
+
+/* 슬라이드 인 애니메이션 (새 아이템 추가) */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.2s ease-out;
+}
+
+/* 프로그레스 링 (스피너) */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* 타이핑 커서 깜빡임 */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-cursor-blink {
+  animation: blink 0.8s step-end infinite;
+}
+```
+
+### 11.8 SpinnerIcon 컴포넌트
+
+```typescript
+// assets/icons/SpinnerIcon.tsx
+
+interface SpinnerIconProps {
+  className?: string;
+}
+
+export const SpinnerIcon = ({ className }: SpinnerIconProps) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle
+      cx="12"
+      cy="12"
+      r="10"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeDasharray="31.4 31.4"
+      strokeDashoffset="10"
+    />
+  </svg>
+);
+```
+
+### 11.9 전체 타임라인 요약
+
+| 시점 | 사이드바 상태 | UI 표시 |
+|------|-------------|---------|
+| **T+0ms** | `creating` | "New Chat" + 🔄 스피너, 상단에 슬라이드 인 |
+| **T+100ms** | `streaming` | "New Chat" + 🔄 스피너 (변화 없음) |
+| **T+3000ms** | `title_animating` | "페█" → "페트█" → "페트병█" ... |
+| **T+4000ms** | `complete` | "페트병 분리배출 방법..." + "방금" |
+
+### 11.10 제목 생성 전략
+
+| 방법 | 설명 | 장단점 |
+|------|------|--------|
+| **첫 질문 truncate** | `userMessage.slice(0, 25)` | 간단, 즉시 표시 |
+| **백엔드 preview** | `done.result.persistence.user_message` | 백엔드 일관성 |
+| **LLM 요약** | 별도 API로 제목 요약 생성 | 고품질, 추가 API 필요 |
+
+현재 설계는 **첫 질문 truncate** 방식을 기본으로 하고, 추후 백엔드에서 제목 요약 기능 추가 가능합니다.
+
+---
+
 **작성일**: 2026-01-19
 **상태**: 설계 완료
