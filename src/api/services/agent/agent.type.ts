@@ -228,6 +228,7 @@ export interface UpdateChatTitleRequest {
 /** 채팅 상세 요청 파라미터 */
 export interface ChatDetailParams {
   limit?: number;
+  /** 페이징 커서 (ISO 8601 타임스탬프) */
   cursor?: string;
 }
 
