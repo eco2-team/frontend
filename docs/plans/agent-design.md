@@ -1,7 +1,7 @@
-# Chat Sidebar 설계
+# Agent 페이지 설계
 
-> 백엔드 세션 구조 기반 우측 사이드바 컴포넌트 설계
-> Reference: Claude Code 스타일 (이미지 참조)
+> 기존 Chat과 분리된 신규 Agent 페이지 설계
+> SSE 토큰 스트리밍, 사이드바, 모델 선택 지원
 
 ---
 
@@ -98,9 +98,9 @@ interface ChatListResponse {
 ### 3.1 컴포넌트 Props
 
 ```typescript
-// types/chat-sidebar.ts
+// types/agent.ts
 
-export interface ChatSidebarItem {
+export interface AgentSidebarItem {
   id: string;
   title: string;                  // title || preview || "새 대화"
   preview: string | null;
@@ -110,7 +110,7 @@ export interface ChatSidebarItem {
   isArchived?: boolean;
 }
 
-export interface ChatSidebarProps {
+export interface AgentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   currentChatId: string | null;
@@ -119,14 +119,14 @@ export interface ChatSidebarProps {
   onDeleteChat?: (chatId: string) => void;
 }
 
-export interface ChatSidebarItemProps {
-  item: ChatSidebarItem;
+export interface AgentSidebarItemProps {
+  item: AgentSidebarItem;
   isActive: boolean;
   onClick: () => void;
   onDelete?: () => void;
 }
 
-export interface ChatSidebarSearchProps {
+export interface AgentSidebarSearchProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -154,9 +154,9 @@ export interface ChatListResponse {
 }
 
 // 프론트엔드용 변환
-export function toChatSidebarItem(
+export function toAgentSidebarItem(
   response: ChatSummaryResponse
-): ChatSidebarItem {
+): AgentSidebarItem {
   return {
     id: response.id,
     title: response.title || response.preview || '새 대화',
@@ -256,48 +256,100 @@ function truncate(str: string, maxLength: number): string {
 
 ### 5.1 파일 구조
 
+기존 `chat/` 컴포넌트와 분리하여 `agent/`로 신규 구성합니다.
+
 ```
 src/
-├── components/chat/
-│   ├── ChatSidebar/
-│   │   ├── index.ts               # 배럴 export
-│   │   ├── ChatSidebar.tsx        # 메인 컴포넌트
-│   │   ├── ChatSidebarHeader.tsx  # 검색 + 새 대화 버튼
-│   │   ├── ChatSidebarList.tsx    # 대화 목록 (가상화)
-│   │   ├── ChatSidebarItem.tsx    # 개별 아이템
-│   │   ├── ChatSidebarEmpty.tsx   # 빈 상태
-│   │   └── ChatSidebar.styles.ts  # 스타일 (선택적)
+├── pages/
+│   ├── Chat/                        ← 기존 (유지)
+│   │   └── Chat.tsx
 │   │
-│   └── ... (기존 컴포넌트)
+│   └── Agent/                       ← 신규
+│       ├── Agent.tsx
+│       └── index.ts
+│
+├── components/
+│   ├── chat/                        ← 기존 (유지)
+│   │   ├── ChatInputBar.tsx
+│   │   ├── ChatMessageList.tsx
+│   │   └── ChatEndWarningDialog.tsx
+│   │
+│   └── agent/                       ← 신규
+│       ├── index.ts
+│       │
+│       ├── AgentContainer.tsx       # 레이아웃 컨테이너
+│       ├── AgentHeader.tsx          # 헤더 (사이드바 토글)
+│       ├── AgentMessageList.tsx     # 메시지 목록 (스트리밍)
+│       ├── AgentInputBar.tsx        # 입력바 + 모델 선택
+│       ├── AgentThinkingUI.tsx      # Thinking 상태 표시
+│       │
+│       ├── sidebar/
+│       │   ├── AgentSidebar.tsx
+│       │   ├── AgentSidebarHeader.tsx
+│       │   ├── AgentSidebarList.tsx
+│       │   ├── AgentSidebarItem.tsx
+│       │   └── AgentSidebarEmpty.tsx
+│       │
+│       └── ModelSelector.tsx
 │
 ├── hooks/
-│   ├── useChatSidebar.ts          # 사이드바 상태 관리
-│   └── useSwipeDrawer.ts          # 스와이프 제스처 (기존)
+│   ├── useScanSSE.ts                ← 기존
+│   │
+│   └── agent/                       ← 신규
+│       ├── useAgentStream.ts        # SSE 연결 + 토큰 처리
+│       ├── useAgentSidebar.ts       # 사이드바 상태
+│       ├── useAgentSession.ts       # 세션 관리
+│       ├── useModelSelection.ts     # 모델 선택
+│       └── useTypingAnimation.ts    # 타이핑 애니메이션
+│
+├── api/services/
+│   └── agent/                       ← 신규
+│       ├── agent.service.ts
+│       ├── agent.type.ts
+│       ├── agent.queries.ts
+│       └── index.ts
+│
+├── types/
+│   └── agent.ts                     ← 신규
 │
 └── utils/
-    ├── formatRelativeTime.ts      # 상대 시간 포맷
-    └── generateChatTitle.ts       # 제목 생성
+    └── formatRelativeTime.ts        ← 신규
 ```
 
-### 5.2 ChatSidebar.tsx (메인 컴포넌트)
+### 5.2 라우터 설정
+
+**Phase 1: 병행 운영**
+```typescript
+// App.tsx
+<Route path='chat' element={<Chat />} />      // 기존
+<Route path='agent' element={<Agent />} />    // 신규 (테스트)
+```
+
+**Phase 2: 교체**
+```typescript
+// App.tsx
+<Route path='chat' element={<Agent />} />     // agent로 교체
+```
+
+### 5.3 AgentSidebar.tsx (메인 컴포넌트)
 
 ```typescript
-// components/chat/ChatSidebar/ChatSidebar.tsx
+// components/agent/sidebar/AgentSidebar.tsx
 import { useRef, useState } from 'react';
-import { ChatSidebarHeader } from './ChatSidebarHeader';
-import { ChatSidebarList } from './ChatSidebarList';
-import { ChatSidebarEmpty } from './ChatSidebarEmpty';
-import { useChatSidebar } from '@/hooks/useChatSidebar';
-import type { ChatSidebarProps } from '@/types/chat-sidebar';
+import { AgentSidebarHeader } from './AgentSidebarHeader';
+import { AgentSidebarList } from './AgentSidebarList';
+import { AgentSidebarEmpty } from './AgentSidebarEmpty';
+import { useAgentSidebar } from '@/hooks/agent/useAgentSidebar';
+import type { AgentSidebarProps } from '@/types/agent';
 
-export const ChatSidebar = ({
+export const AgentSidebar = ({
   isOpen,
   onClose,
   currentChatId,
   onSelectChat,
   onNewChat,
   onDeleteChat,
-}: ChatSidebarProps) => {
+}: AgentSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const sidebarRef = useRef<HTMLDivElement>(null);
 
@@ -308,7 +360,7 @@ export const ChatSidebar = ({
     hasMore,
     fetchMore,
     isFetchingMore,
-  } = useChatSidebar({ searchQuery });
+  } = useAgentSidebar({ searchQuery });
 
   // 검색 필터링
   const filteredChats = searchQuery
@@ -337,7 +389,7 @@ export const ChatSidebar = ({
         }`}
       >
         {/* 헤더: 검색 + 새 대화 */}
-        <ChatSidebarHeader
+        <AgentSidebarHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onNewChat={onNewChat}
@@ -346,14 +398,14 @@ export const ChatSidebar = ({
 
         {/* 대화 목록 */}
         {isLoading ? (
-          <ChatSidebarSkeleton />
+          <AgentSidebarSkeleton />
         ) : filteredChats.length === 0 ? (
-          <ChatSidebarEmpty
+          <AgentSidebarEmpty
             hasSearchQuery={!!searchQuery}
             onNewChat={onNewChat}
           />
         ) : (
-          <ChatSidebarList
+          <AgentSidebarList
             chats={filteredChats}
             currentChatId={currentChatId}
             onSelectChat={onSelectChat}
@@ -377,7 +429,7 @@ export const ChatSidebar = ({
 };
 
 // 로딩 스켈레톤
-const ChatSidebarSkeleton = () => (
+const AgentSidebarSkeleton = () => (
   <div className="flex-1 space-y-2 p-4">
     {[...Array(5)].map((_, i) => (
       <div key={i} className="animate-pulse">
@@ -394,25 +446,25 @@ const ChatSidebarSkeleton = () => (
 );
 ```
 
-### 5.3 ChatSidebarHeader.tsx
+### 5.3 AgentSidebarHeader.tsx
 
 ```typescript
-// components/chat/ChatSidebar/ChatSidebarHeader.tsx
+// components/agent/sidebar/AgentSidebarHeader.tsx
 import { SearchIcon, PlusIcon, XIcon } from '@/assets/icons';
 
-interface ChatSidebarHeaderProps {
+interface AgentSidebarHeaderProps {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   onNewChat: () => void;
   onClose: () => void;
 }
 
-export const ChatSidebarHeader = ({
+export const AgentSidebarHeader = ({
   searchQuery,
   onSearchChange,
   onNewChat,
   onClose,
-}: ChatSidebarHeaderProps) => {
+}: AgentSidebarHeaderProps) => {
   return (
     <div className="border-b border-[#333] p-4">
       {/* 닫기 버튼 */}
@@ -451,27 +503,27 @@ export const ChatSidebarHeader = ({
 };
 ```
 
-### 5.4 ChatSidebarItem.tsx
+### 5.4 AgentSidebarItem.tsx
 
 ```typescript
-// components/chat/ChatSidebar/ChatSidebarItem.tsx
+// components/agent/sidebar/AgentSidebarItem.tsx
 import { formatRelativeTime } from '@/utils/formatRelativeTime';
 import { MessageIcon, TrashIcon } from '@/assets/icons';
-import type { ChatSidebarItem as ChatSidebarItemType } from '@/types/chat-sidebar';
+import type { AgentSidebarItem as AgentSidebarItemType } from '@/types/agent';
 
-interface ChatSidebarItemProps {
-  item: ChatSidebarItemType;
+interface AgentSidebarItemProps {
+  item: AgentSidebarItemType;
   isActive: boolean;
   onClick: () => void;
   onDelete?: () => void;
 }
 
-export const ChatSidebarItem = ({
+export const AgentSidebarItem = ({
   item,
   isActive,
   onClick,
   onDelete,
-}: ChatSidebarItemProps) => {
+}: AgentSidebarItemProps) => {
   const relativeTime = formatRelativeTime(item.lastMessageAt || item.createdAt);
 
   return (
@@ -509,16 +561,16 @@ export const ChatSidebarItem = ({
 };
 ```
 
-### 5.5 ChatSidebarList.tsx
+### 5.5 AgentSidebarList.tsx
 
 ```typescript
-// components/chat/ChatSidebar/ChatSidebarList.tsx
+// components/agent/sidebar/AgentSidebarList.tsx
 import { useRef, useCallback } from 'react';
-import { ChatSidebarItem } from './ChatSidebarItem';
-import type { ChatSidebarItem as ChatSidebarItemType } from '@/types/chat-sidebar';
+import { AgentSidebarItem } from './AgentSidebarItem';
+import type { AgentSidebarItem as AgentSidebarItemType } from '@/types/agent';
 
-interface ChatSidebarListProps {
-  chats: ChatSidebarItemType[];
+interface AgentSidebarListProps {
+  chats: AgentSidebarItemType[];
   currentChatId: string | null;
   onSelectChat: (chatId: string) => void;
   onDeleteChat?: (chatId: string) => void;
@@ -527,7 +579,7 @@ interface ChatSidebarListProps {
   isLoadingMore: boolean;
 }
 
-export const ChatSidebarList = ({
+export const AgentSidebarList = ({
   chats,
   currentChatId,
   onSelectChat,
@@ -535,7 +587,7 @@ export const ChatSidebarList = ({
   hasMore,
   onLoadMore,
   isLoadingMore,
-}: ChatSidebarListProps) => {
+}: AgentSidebarListProps) => {
   const listRef = useRef<HTMLDivElement>(null);
 
   // 무한 스크롤 감지
@@ -560,7 +612,7 @@ export const ChatSidebarList = ({
       {/* 대화 목록 */}
       <div className="space-y-1">
         {chats.map((chat) => (
-          <ChatSidebarItem
+          <AgentSidebarItem
             key={chat.id}
             item={chat}
             isActive={chat.id === currentChatId}
@@ -585,21 +637,21 @@ export const ChatSidebarList = ({
 };
 ```
 
-### 5.6 ChatSidebarEmpty.tsx
+### 5.6 AgentSidebarEmpty.tsx
 
 ```typescript
-// components/chat/ChatSidebar/ChatSidebarEmpty.tsx
+// components/agent/sidebar/AgentSidebarEmpty.tsx
 import { MessageIcon, PlusIcon } from '@/assets/icons';
 
-interface ChatSidebarEmptyProps {
+interface AgentSidebarEmptyProps {
   hasSearchQuery: boolean;
   onNewChat: () => void;
 }
 
-export const ChatSidebarEmpty = ({
+export const AgentSidebarEmpty = ({
   hasSearchQuery,
   onNewChat,
-}: ChatSidebarEmptyProps) => {
+}: AgentSidebarEmptyProps) => {
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
       <MessageIcon className="mb-4 h-12 w-12 text-[#444]" />
@@ -626,22 +678,22 @@ export const ChatSidebarEmpty = ({
 
 ## 6. Hook 구현
 
-### 6.1 useChatSidebar.ts
+### 6.1 useAgentSidebar.ts
 
 ```typescript
-// hooks/useChatSidebar.ts
+// hooks/useAgentSidebar.ts
 import { useMemo } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ChatService, toChatSidebarItem } from '@/api/services/chat';
-import type { ChatSidebarItem } from '@/types/chat-sidebar';
+import { ChatService, toAgentSidebarItem } from '@/api/services/chat';
+import type { AgentSidebarItem } from '@/types/agent';
 
-interface UseChatSidebarOptions {
+interface UseAgentSidebarOptions {
   searchQuery?: string;
 }
 
-interface UseChatSidebarReturn {
-  chats: ChatSidebarItem[];
-  archivedChats: ChatSidebarItem[];
+interface UseAgentSidebarReturn {
+  chats: AgentSidebarItem[];
+  archivedChats: AgentSidebarItem[];
   isLoading: boolean;
   hasMore: boolean;
   fetchMore: () => void;
@@ -650,9 +702,9 @@ interface UseChatSidebarReturn {
   deleteChat: (chatId: string) => Promise<void>;
 }
 
-export const useChatSidebar = ({
+export const useAgentSidebar = ({
   searchQuery,
-}: UseChatSidebarOptions = {}): UseChatSidebarReturn => {
+}: UseAgentSidebarOptions = {}): UseAgentSidebarReturn => {
   const queryClient = useQueryClient();
 
   // 대화 목록 조회 (무한 스크롤)
@@ -690,7 +742,7 @@ export const useChatSidebar = ({
     if (!data?.pages) return [];
     return data.pages
       .flatMap((page) => page.chats)
-      .map(toChatSidebarItem);
+      .map(toAgentSidebarItem);
   }, [data]);
 
   return {
@@ -762,7 +814,7 @@ export class ChatService {
 ```typescript
 // pages/Chat/Chat.tsx
 import { useState } from 'react';
-import { ChatSidebar } from '@/components/chat/ChatSidebar';
+import { AgentSidebar } from '@/components/agent/sidebar';
 import { useSwipeDrawer } from '@/hooks/useSwipeDrawer';
 
 const Chat = () => {
@@ -799,7 +851,7 @@ const Chat = () => {
       <ChatInputBar /* ... */ />
 
       {/* 사이드바 */}
-      <ChatSidebar
+      <AgentSidebar
         isOpen={isSidebarOpen}
         onClose={closeSidebar}
         currentChatId={currentChatId}
@@ -817,14 +869,14 @@ const Chat = () => {
 
 ### 필수 구현
 
-- [ ] `types/chat-sidebar.ts` - 타입 정의
+- [ ] `types/agent.ts` - 타입 정의
 - [ ] `utils/formatRelativeTime.ts` - 상대 시간 포맷
-- [ ] `components/chat/ChatSidebar/ChatSidebar.tsx` - 메인 컴포넌트
-- [ ] `components/chat/ChatSidebar/ChatSidebarHeader.tsx` - 검색 + 새 대화
-- [ ] `components/chat/ChatSidebar/ChatSidebarList.tsx` - 목록 (무한 스크롤)
-- [ ] `components/chat/ChatSidebar/ChatSidebarItem.tsx` - 개별 아이템
-- [ ] `components/chat/ChatSidebar/ChatSidebarEmpty.tsx` - 빈 상태
-- [ ] `hooks/useChatSidebar.ts` - 상태 관리 훅
+- [ ] `components/agent/sidebar/AgentSidebar.tsx` - 메인 컴포넌트
+- [ ] `components/agent/sidebar/AgentSidebarHeader.tsx` - 검색 + 새 대화
+- [ ] `components/agent/sidebar/AgentSidebarList.tsx` - 목록 (무한 스크롤)
+- [ ] `components/agent/sidebar/AgentSidebarItem.tsx` - 개별 아이템
+- [ ] `components/agent/sidebar/AgentSidebarEmpty.tsx` - 빈 상태
+- [ ] `hooks/useAgentSidebar.ts` - 상태 관리 훅
 - [ ] API 서비스 확장 (`getChats`, `createChat`, `deleteChat`)
 
 ### 선택적 구현
@@ -979,10 +1031,10 @@ WHERE id = chat_id;
 └─────────────────────────────────┘
 ```
 
-### 11.2 ChatSidebarItem 상태 타입
+### 11.2 AgentSidebarItem 상태 타입
 
 ```typescript
-// types/chat-sidebar.ts
+// types/agent.ts
 
 export type ChatItemStatus =
   | 'idle'              // 일반 상태
@@ -991,7 +1043,7 @@ export type ChatItemStatus =
   | 'title_animating'   // 제목 타이핑 애니메이션 중
   | 'complete';         // 완료
 
-export interface ChatSidebarItem {
+export interface AgentSidebarItem {
   id: string;
   title: string;                  // "New Chat" → "페트병 분리배출..."
   preview: string | null;
@@ -1005,27 +1057,27 @@ export interface ChatSidebarItem {
 }
 ```
 
-### 11.3 ChatSidebarItem 컴포넌트 (애니메이션 지원)
+### 11.3 AgentSidebarItem 컴포넌트 (애니메이션 지원)
 
 ```typescript
-// components/chat/ChatSidebar/ChatSidebarItem.tsx
+// components/agent/sidebar/AgentSidebarItem.tsx
 
 import { useEffect, useState } from 'react';
 import { formatRelativeTime } from '@/utils/formatRelativeTime';
 import { MessageIcon, SpinnerIcon } from '@/assets/icons';
-import type { ChatSidebarItem as ChatSidebarItemType } from '@/types/chat-sidebar';
+import type { AgentSidebarItem as AgentSidebarItemType } from '@/types/agent';
 
-interface ChatSidebarItemProps {
-  item: ChatSidebarItemType;
+interface AgentSidebarItemProps {
+  item: AgentSidebarItemType;
   isActive: boolean;
   onClick: () => void;
 }
 
-export const ChatSidebarItem = ({
+export const AgentSidebarItem = ({
   item,
   isActive,
   onClick,
-}: ChatSidebarItemProps) => {
+}: AgentSidebarItemProps) => {
   const isLoading = item.status === 'creating' || item.status === 'streaming';
   const isAnimating = item.status === 'title_animating';
 
@@ -1147,21 +1199,21 @@ export const useTypingAnimation = ({
 ### 11.5 사이드바 상태 관리 (새 채팅 애니메이션)
 
 ```typescript
-// hooks/useChatSidebar.ts (확장)
+// hooks/useAgentSidebar.ts (확장)
 
 import { useState, useCallback } from 'react';
 import { useTypingAnimation } from './useTypingAnimation';
-import type { ChatSidebarItem, ChatItemStatus } from '@/types/chat-sidebar';
+import type { AgentSidebarItem, ChatItemStatus } from '@/types/agent';
 
-export const useChatSidebar = () => {
-  const [chats, setChats] = useState<ChatSidebarItem[]>([]);
+export const useAgentSidebar = () => {
+  const [chats, setChats] = useState<AgentSidebarItem[]>([]);
   const [newChatId, setNewChatId] = useState<string | null>(null);
 
   /**
    * 새 채팅 생성 시작 - "New Chat" + 로딩 상태로 상단에 추가
    */
   const startNewChat = useCallback((chatId: string) => {
-    const newChat: ChatSidebarItem = {
+    const newChat: AgentSidebarItem = {
       id: chatId,
       title: 'New Chat',
       preview: null,
@@ -1269,7 +1321,7 @@ const Chat = () => {
     setStreaming,
     setTitleWithAnimation,
     setError,
-  } = useChatSidebar();
+  } = useAgentSidebar();
 
   const handleSend = async (text: string, imageUrl?: string) => {
     let chatId = currentChatId;
