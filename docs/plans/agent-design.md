@@ -924,6 +924,388 @@ POST /api/v1/chat/abc-123/messages   ← 메시지 전송
     │
     ▼
 EventSource(stream_url)              ← SSE 연결
+    │
+    ▼
+token 이벤트 수신 → 타이핑 효과로 출력
+```
+
+---
+
+## 10.5 SSE 토큰 스트리밍 상세
+
+### 10.5.1 이벤트 흐름
+
+```
+[EventSource 연결]
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  event: intent (started)    → "어떤 건지 파악해볼게요"         │
+│  event: intent (completed)  → "아, 분리배출 궁금하시군요!"     │
+│  event: router (completed)  → "필요한 정보 찾아볼게요"         │
+│  event: answer (started)    → "정리해서 알려드릴게요"          │
+├──────────────────────────────────────────────────────────────┤
+│  event: token {content:"유", seq:1001}  → 메시지에 "유" 추가   │
+│  event: token {content:"리", seq:1002}  → 메시지에 "리" 추가   │
+│  event: token {content:"병", seq:1003}  → 메시지에 "병" 추가   │
+│  event: token {content:"은", seq:1004}  → ...                 │
+│  ... (100~200개 토큰)                                         │
+├──────────────────────────────────────────────────────────────┤
+│  event: done (completed)    → 완료, EventSource.close()       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 10.5.2 TypeScript 타입
+
+```typescript
+// types/agent.ts
+
+// SSE 이벤트 타입
+type SSEEventType =
+  | 'token'           // 실시간 토큰 스트리밍
+  | 'token_recovery'  // 늦은 구독자용 스냅샷
+  | 'intent'          // Intent 분류
+  | 'router'          // 라우팅
+  | 'answer'          // 답변 생성 상태
+  | 'done'            // 완료
+  | 'error'           // 에러
+  | 'keepalive';      // 연결 유지
+
+// 토큰 이벤트 (가장 중요!)
+interface TokenEvent {
+  content: string;    // 토큰 텍스트 ("유", "리", "병" ...)
+  seq: number;        // 시퀀스 번호 (1001부터 시작)
+  node: string;       // "answer"
+}
+
+// 토큰 복구 이벤트 (늦은 연결 시)
+interface TokenRecoveryEvent {
+  stage: 'token_recovery';
+  status: 'snapshot';
+  accumulated: string;  // 누적된 전체 답변
+  last_seq: number;
+  completed: boolean;
+}
+
+// Stage 이벤트
+interface StageEvent {
+  job_id: string;
+  stage: string;
+  status: 'started' | 'completed';
+  seq: number;
+  progress: number;
+  result: any;
+  message: string;
+}
+```
+
+### 10.5.3 useAgentStream Hook
+
+```typescript
+// hooks/agent/useAgentStream.ts
+
+import { useState, useCallback, useRef } from 'react';
+
+interface UseAgentStreamOptions {
+  onStageChange?: (stage: string, status: string, message: string) => void;
+  onComplete?: (answer: string) => void;
+  onError?: (error: string) => void;
+}
+
+interface UseAgentStreamReturn {
+  streamingText: string;       // 현재까지 누적된 텍스트
+  isStreaming: boolean;        // 스트리밍 중 여부
+  currentStage: string | null; // 현재 stage
+  connect: (streamUrl: string) => void;
+  disconnect: () => void;
+}
+
+export const useAgentStream = ({
+  onStageChange,
+  onComplete,
+  onError,
+}: UseAgentStreamOptions = {}): UseAgentStreamReturn => {
+  const [streamingText, setStreamingText] = useState('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [currentStage, setCurrentStage] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  const connect = useCallback((streamUrl: string) => {
+    // 기존 연결 정리
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    setStreamingText('');
+    setIsStreaming(true);
+
+    const eventSource = new EventSource(streamUrl, {
+      withCredentials: true,
+    });
+    eventSourceRef.current = eventSource;
+
+    // 토큰 스트리밍 (핵심!)
+    eventSource.addEventListener('token', (event) => {
+      const data: TokenEvent = JSON.parse(event.data);
+      // 토큰을 누적하여 타이핑 효과
+      setStreamingText((prev) => prev + data.content);
+    });
+
+    // 토큰 복구 (늦은 연결 시)
+    eventSource.addEventListener('token_recovery', (event) => {
+      const data: TokenRecoveryEvent = JSON.parse(event.data);
+      // 누적된 전체 텍스트로 대체
+      setStreamingText(data.accumulated);
+      if (data.completed) {
+        setIsStreaming(false);
+        onComplete?.(data.accumulated);
+      }
+    });
+
+    // Stage 이벤트 (Thinking UI용)
+    const stageHandler = (stageName: string) => (event: MessageEvent) => {
+      const data: StageEvent = JSON.parse(event.data);
+      setCurrentStage(stageName);
+      onStageChange?.(stageName, data.status, data.message);
+    };
+
+    eventSource.addEventListener('intent', stageHandler('intent'));
+    eventSource.addEventListener('router', stageHandler('router'));
+    eventSource.addEventListener('answer', stageHandler('answer'));
+
+    // 완료
+    eventSource.addEventListener('done', (event) => {
+      const data: StageEvent = JSON.parse(event.data);
+      setIsStreaming(false);
+      setCurrentStage(null);
+      onComplete?.(data.result?.answer || streamingText);
+      eventSource.close();
+    });
+
+    // 에러
+    eventSource.addEventListener('error', (event) => {
+      console.error('SSE Error:', event);
+      setIsStreaming(false);
+      onError?.('스트리밍 연결 오류');
+      eventSource.close();
+    });
+
+    // keepalive (무시)
+    eventSource.addEventListener('keepalive', () => {
+      // 연결 유지용, 별도 처리 불필요
+    });
+  }, [onStageChange, onComplete, onError]);
+
+  const disconnect = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    setIsStreaming(false);
+  }, []);
+
+  return {
+    streamingText,
+    isStreaming,
+    currentStage,
+    connect,
+    disconnect,
+  };
+};
+```
+
+### 10.5.4 AgentMessageList 컴포넌트
+
+```typescript
+// components/agent/AgentMessageList.tsx
+
+interface AgentMessageListProps {
+  messages: Message[];
+  streamingText: string;  // 현재 스트리밍 중인 텍스트
+  isStreaming: boolean;
+}
+
+export const AgentMessageList = ({
+  messages,
+  streamingText,
+  isStreaming,
+}: AgentMessageListProps) => {
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      {/* 기존 메시지들 */}
+      {messages.map((msg) => (
+        <MessageBubble key={msg.id} message={msg} />
+      ))}
+
+      {/* 스트리밍 중인 메시지 (타이핑 효과) */}
+      {isStreaming && streamingText && (
+        <div className="flex gap-3 mb-4">
+          <div className="w-8 h-8 rounded-full bg-[#333]" />
+          <div className="flex-1 bg-[#2a2a2a] rounded-lg p-3">
+            <p className="text-white whitespace-pre-wrap">
+              {streamingText}
+              <span className="animate-pulse">▊</span>
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+### 10.5.5 Agent 페이지 통합
+
+```typescript
+// pages/Agent/Agent.tsx
+
+import { useState } from 'react';
+import { useAgentStream } from '@/hooks/agent/useAgentStream';
+import { useAgentSession } from '@/hooks/agent/useAgentSession';
+import { AgentService } from '@/api/services/agent';
+
+const Agent = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [thinkingMessage, setThinkingMessage] = useState<string | null>(null);
+
+  const { currentChatId, createSession } = useAgentSession();
+
+  const {
+    streamingText,
+    isStreaming,
+    currentStage,
+    connect,
+  } = useAgentStream({
+    onStageChange: (stage, status, message) => {
+      // Thinking UI 업데이트
+      setThinkingMessage(getStageMessage(stage, status));
+    },
+    onComplete: (answer) => {
+      // 완료 시 메시지 목록에 추가
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), role: 'assistant', content: answer },
+      ]);
+      setThinkingMessage(null);
+    },
+  });
+
+  const handleSend = async (text: string, model: string) => {
+    // 1. 사용자 메시지 즉시 표시
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now().toString(), role: 'user', content: text },
+    ]);
+
+    // 2. 세션 생성 (없으면)
+    let chatId = currentChatId;
+    if (!chatId) {
+      chatId = await createSession();
+    }
+
+    // 3. 메시지 전송 → stream_url 받기
+    const { stream_url } = await AgentService.sendMessage(chatId, {
+      message: text,
+      model,
+    });
+
+    // 4. SSE 연결 → 토큰 스트리밍 시작
+    connect(stream_url);
+  };
+
+  return (
+    <AgentContainer>
+      <AgentHeader />
+
+      {/* Thinking UI */}
+      {thinkingMessage && (
+        <AgentThinkingUI message={thinkingMessage} />
+      )}
+
+      {/* 메시지 목록 + 스트리밍 */}
+      <AgentMessageList
+        messages={messages}
+        streamingText={streamingText}
+        isStreaming={isStreaming}
+      />
+
+      <AgentInputBar onSend={handleSend} disabled={isStreaming} />
+    </AgentContainer>
+  );
+};
+
+// Stage → 메시지 매핑
+function getStageMessage(stage: string, status: string): string {
+  const messages: Record<string, Record<string, string>> = {
+    intent: {
+      started: '어떤 건지 파악해볼게요',
+      completed: '질문 파악 완료!',
+    },
+    router: {
+      completed: '필요한 정보 찾아볼게요',
+    },
+    answer: {
+      started: '정리해서 알려드릴게요',
+    },
+  };
+  return messages[stage]?.[status] || '';
+}
+```
+
+### 10.5.6 타이핑 효과 CSS
+
+```css
+/* 커서 깜빡임 */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-cursor {
+  animation: blink 0.8s step-end infinite;
+}
+```
+
+### 10.5.7 시퀀스 다이어그램
+
+```
+┌──────────┐      ┌──────────┐      ┌──────────┐      ┌──────────┐
+│  User    │      │ Frontend │      │  API     │      │   SSE    │
+└────┬─────┘      └────┬─────┘      └────┬─────┘      └────┬─────┘
+     │                 │                 │                 │
+     │ "페트병 버리는 법"│                 │                 │
+     │────────────────>│                 │                 │
+     │                 │                 │                 │
+     │                 │ POST /messages  │                 │
+     │                 │────────────────>│                 │
+     │                 │                 │                 │
+     │                 │ {stream_url}    │                 │
+     │                 │<────────────────│                 │
+     │                 │                 │                 │
+     │                 │ EventSource(url)│                 │
+     │                 │─────────────────────────────────>│
+     │                 │                 │                 │
+     │                 │      event: intent (started)     │
+     │                 │<─────────────────────────────────│
+     │ "어떤 건지..."   │                 │                 │
+     │<────────────────│                 │                 │
+     │                 │                 │                 │
+     │                 │      event: token {content:"유"} │
+     │                 │<─────────────────────────────────│
+     │ "유"            │                 │                 │
+     │<────────────────│                 │                 │
+     │                 │                 │                 │
+     │                 │      event: token {content:"리"} │
+     │                 │<─────────────────────────────────│
+     │ "유리"          │                 │                 │
+     │<────────────────│                 │                 │
+     │                 │                 │                 │
+     │       ...       │      (100~200 tokens)            │
+     │                 │                 │                 │
+     │                 │      event: done                 │
+     │                 │<─────────────────────────────────│
+     │ 완료!           │                 │                 │
+     │<────────────────│                 │                 │
 ```
 
 ### 10.2 구현 코드
