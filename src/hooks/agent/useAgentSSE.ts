@@ -78,6 +78,10 @@ interface UseAgentSSEReturn {
 const MAX_RECONNECT_ATTEMPTS = 3;
 const INITIAL_RECONNECT_DELAY = 1000;
 
+// 타임아웃 설정 (LLM 응답 시간 고려)
+const DEFAULT_EVENT_TIMEOUT = 60000; // 60초
+const IMAGE_GENERATION_TIMEOUT = 120000; // 이미지 생성은 2분
+
 export const useAgentSSE = (
   options: UseAgentSSEOptions = {},
 ): UseAgentSSEReturn => {
@@ -93,6 +97,8 @@ export const useAgentSSE = (
   const currentJobIdRef = useRef<string | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eventTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentTimeoutDurationRef = useRef(DEFAULT_EVENT_TIMEOUT);
   const isManualDisconnectRef = useRef(false);
   const accumulatedTextRef = useRef('');
 
@@ -115,11 +121,36 @@ export const useAgentSSE = (
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
     }
+    if (eventTimeoutRef.current) {
+      clearTimeout(eventTimeoutRef.current);
+      eventTimeoutRef.current = null;
+    }
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
   }, []);
+
+  // 이벤트 타임아웃 리셋 (이벤트 받을 때마다 호출)
+  const resetEventTimeout = useCallback((duration?: number) => {
+    if (eventTimeoutRef.current) {
+      clearTimeout(eventTimeoutRef.current);
+    }
+
+    const timeoutDuration = duration ?? currentTimeoutDurationRef.current;
+    currentTimeoutDurationRef.current = timeoutDuration;
+
+    eventTimeoutRef.current = setTimeout(() => {
+      if (!isManualDisconnectRef.current && eventSourceRef.current) {
+        const err = new Error('서버 응답 타임아웃');
+        setError(err);
+        onErrorRef.current?.(err);
+        cleanup();
+        setIsStreaming(false);
+        setCurrentStage(null);
+      }
+    }, timeoutDuration);
+  }, [cleanup]);
 
   // Disconnect
   const disconnect = useCallback(() => {
@@ -153,6 +184,12 @@ export const useAgentSSE = (
         };
         setCurrentStage(stage);
         onProgressRef.current?.(stage);
+
+        // 이미지 생성은 타임아웃 더 길게
+        const timeout = data.stage === 'image_generation'
+          ? IMAGE_GENERATION_TIMEOUT
+          : DEFAULT_EVENT_TIMEOUT;
+        resetEventTimeout(timeout);
       } catch (err) {
         console.error('Progress event parse error:', err);
       }
@@ -170,6 +207,7 @@ export const useAgentSSE = (
         accumulatedTextRef.current += data.content;
         setStreamingText(accumulatedTextRef.current);
         onTokenRef.current?.(data.content);
+        resetEventTimeout(); // 토큰 받을 때마다 타임아웃 리셋
       } catch (err) {
         console.error('Token parse error:', err);
       }
@@ -266,8 +304,10 @@ export const useAgentSSE = (
     // Connection opened
     es.onopen = () => {
       reconnectAttemptRef.current = 0;
+      // 연결 후 첫 이벤트 타임아웃 시작
+      resetEventTimeout(DEFAULT_EVENT_TIMEOUT);
     };
-  }, [cleanup]);
+  }, [cleanup, resetEventTimeout]);
 
   // Connect
   const connect = useCallback(
