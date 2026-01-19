@@ -4,12 +4,12 @@ import { Outlet, useLocation } from 'react-router-dom';
 
 const AppLayout = () => {
   const { pathname } = useLocation();
-  const hideBottomNavPaths = ['/chat', '/camera', '/myPage'];
+  const hideBottomNavPaths = ['/chat', '/camera', '/myPage', '/agent'];
   const showBottomNav = !hideBottomNavPaths.some((path) =>
     pathname.startsWith(path),
   );
 
-  const fullScreenPaths = ['/camera', '/map'];
+  const fullScreenPaths = ['/camera', '/map', '/agent'];
   const isFullScreen = fullScreenPaths.some((path) => pathname === path);
 
   const showAppHeaderPaths = [

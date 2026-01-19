@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
+import Agent from '@/pages/Agent/Agent';
 import AppLayout from '@/pages/App/AppLayout';
 import Answer from '@/pages/Camera/Answer';
 import Camera from '@/pages/Camera/Camera';
@@ -26,6 +27,7 @@ const App = () => (
         <Route path='edit' element={<EditPage />} />
       </Route>
       <Route path='chat' element={<Chat />} />
+      <Route path='agent' element={<Agent />} />
       <Route path='camera'>
         <Route index element={<Camera />} />
         <Route path='loading' element={<Loading />} />

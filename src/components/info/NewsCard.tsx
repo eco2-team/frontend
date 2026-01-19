@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { NewsArticle } from '@/api/services/info/info.type';
 
 interface NewsCardProps {
@@ -23,9 +24,13 @@ const formatDate = (dateString: string): string => {
 };
 
 export const NewsCard = ({ article }: NewsCardProps) => {
+  const [imageError, setImageError] = useState(false);
+
   const handleClick = () => {
     window.open(article.url, '_blank', 'noopener,noreferrer');
   };
+
+  const showThumbnail = article.thumbnail_url && !imageError;
 
   return (
     <article
@@ -33,16 +38,14 @@ export const NewsCard = ({ article }: NewsCardProps) => {
       onClick={handleClick}
     >
       <div className='flex gap-3'>
-        {article.thumbnail_url && (
+        {showThumbnail && (
           <div className='h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100'>
             <img
-              src={article.thumbnail_url}
+              src={article.thumbnail_url!}
               alt=''
               className='h-full w-full object-cover'
               loading='lazy'
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
+              onError={() => setImageError(true)}
             />
           </div>
         )}
