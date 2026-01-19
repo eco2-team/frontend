@@ -2,9 +2,10 @@
  * Agent 사이드바
  * - 라이트 테마 적용
  * - Pull-to-refresh 지원
+ * - 무한 스크롤 (IntersectionObserver)
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { Search, Plus, X, Loader2 } from 'lucide-react';
@@ -43,6 +44,32 @@ export const AgentSidebar = ({
   const handleRefresh = async () => {
     await refetch();
   };
+
+  // 무한 스크롤 (IntersectionObserver)
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const handleIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
+  );
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(handleIntersect, {
+      threshold: 0.1,
+    });
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [handleIntersect]);
 
   // 모든 대화 목록
   const allChats = data?.pages.flatMap((page) => page.chats) ?? [];
@@ -138,15 +165,14 @@ export const AgentSidebar = ({
                 />
               ))}
 
-              {/* 더 불러오기 */}
-              {hasNextPage && (
-                <button
-                  onClick={() => fetchNextPage()}
-                  disabled={isFetchingNextPage}
-                  className='text-text-inactive w-full py-2 text-center text-sm hover:text-gray-700'
-                >
-                  {isFetchingNextPage ? '불러오는 중...' : '더 보기'}
-                </button>
+              {/* 무한 스크롤 트리거 */}
+              <div ref={loadMoreRef} className='h-1' />
+
+              {/* 로딩 인디케이터 */}
+              {isFetchingNextPage && (
+                <div className='flex justify-center py-3'>
+                  <Loader2 className='h-4 w-4 animate-spin text-gray-400' />
+                </div>
               )}
             </div>
           )}
