@@ -3,10 +3,13 @@
  * - 스트리밍 중 전송버튼 → STOP 버튼으로 변경
  * - 갤러리 첨부 지원
  * - 스트리밍 중에도 입력 가능 (큐에 추가됨)
+ * - 모델 선택 지원
  */
 
 import { useState, useRef } from 'react';
-import { Loader2, Image, Square } from 'lucide-react';
+import { Loader2, Image, Square, ChevronUp } from 'lucide-react';
+import { AVAILABLE_MODELS } from '@/api/services/agent';
+import type { ModelOption } from '@/api/services/agent';
 import SendActiveIcon from '@/assets/icons/icon_send_active.svg';
 import SendInactiveIcon from '@/assets/icons/icon_send_inactive.svg';
 
@@ -21,6 +24,9 @@ interface AgentInputBarProps {
   isUploading: boolean;
   onSelectImage: (file: File | null) => void;
   onClearImage: () => void;
+  // 모델 선택
+  selectedModel: ModelOption;
+  onSelectModel: (model: ModelOption) => void;
 }
 
 export const AgentInputBar = ({
@@ -33,8 +39,11 @@ export const AgentInputBar = ({
   isUploading,
   onSelectImage,
   onClearImage,
+  selectedModel,
+  onSelectModel,
 }: AgentInputBarProps) => {
   const [text, setText] = useState('');
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // 스트리밍 또는 로딩 중인지
@@ -64,8 +73,13 @@ export const AgentInputBar = ({
 
   const canSend = (text.trim() || selectedImage) && !isUploading;
 
+  const handleModelSelect = (model: ModelOption) => {
+    onSelectModel(model);
+    setModelDropdownOpen(false);
+  };
+
   return (
-    <div className='max-w-app flex w-full flex-col gap-3 bg-white px-4 pt-3 pb-6 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
+    <div className='max-w-app flex w-full flex-col gap-2 bg-white px-4 pt-3 pb-4 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
       {/* 숨겨진 갤러리 input */}
       <input
         ref={galleryInputRef}
@@ -99,7 +113,7 @@ export const AgentInputBar = ({
         </div>
       )}
 
-      {/* 하단 입력바 */}
+      {/* 입력바 */}
       <div className='flex w-full items-center gap-2'>
         {/* 갤러리 버튼 */}
         <button
@@ -139,6 +153,48 @@ export const AgentInputBar = ({
               className='h-[38px] w-[38px]'
             />
           </button>
+        )}
+      </div>
+
+      {/* 모델 선택 */}
+      <div className='relative flex justify-start pl-1'>
+        <button
+          onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+          className='flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100'
+        >
+          {selectedModel.label}
+          <ChevronUp
+            className={`h-3 w-3 transition-transform ${modelDropdownOpen ? '' : 'rotate-180'}`}
+          />
+        </button>
+
+        {modelDropdownOpen && (
+          <>
+            <div
+              className='fixed inset-0 z-10'
+              onClick={() => setModelDropdownOpen(false)}
+            />
+            <div className='absolute bottom-full left-0 z-20 mb-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg'>
+              {AVAILABLE_MODELS.map((model) => (
+                <button
+                  key={model.id}
+                  onClick={() => handleModelSelect(model)}
+                  className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
+                    selectedModel.id === model.id ? 'bg-gray-50' : ''
+                  }`}
+                >
+                  <span className='text-sm font-medium text-gray-900'>
+                    {model.label}
+                  </span>
+                  {model.description && (
+                    <span className='text-xs text-gray-500'>
+                      {model.description}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

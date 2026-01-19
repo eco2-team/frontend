@@ -316,9 +316,8 @@ export const useAgentChat = (
       const response = await AgentService.getChatDetail(chatId, {
         limit: 20,
       });
-      // 응답은 최신순이므로 reverse하여 오래된 순서로 표시
-      const sortedMessages = [...response.messages].reverse();
-      setMessages(sortedMessages);
+      // 백엔드가 오래된 순(ASC)으로 반환
+      setMessages(response.messages);
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
     } catch (err) {
@@ -343,9 +342,8 @@ export const useAgentChat = (
         cursor: historyCursor ?? undefined,
       });
 
-      // 응답은 최신순이므로 reverse하여 오래된 순서로 정렬 후 앞에 추가
-      const olderMessages = [...response.messages].reverse();
-      setMessages((prev) => [...olderMessages, ...prev]);
+      // 백엔드가 오래된 순(ASC)으로 반환하므로 앞에 추가
+      setMessages((prev) => [...response.messages, ...prev]);
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
     } catch (err) {

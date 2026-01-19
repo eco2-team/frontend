@@ -6,10 +6,10 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Menu, ChevronDown } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AgentService, AVAILABLE_MODELS } from '@/api/services/agent';
-import type { ChatSummary, ModelOption } from '@/api/services/agent';
+import { AgentService } from '@/api/services/agent';
+import type { ChatSummary } from '@/api/services/agent';
 import { useAgentChat, useMessageQueue } from '@/hooks/agent';
 import type { QueuedMessage } from '@/hooks/agent/useMessageQueue';
 import { AgentSidebar } from './sidebar';
@@ -19,7 +19,6 @@ import { AgentMessageQueue } from './AgentMessageQueue';
 
 export const AgentContainer = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // 이전 스트리밍 상태 추적 (큐 처리용)
@@ -51,15 +50,6 @@ export const AgentContainer = () => {
     loadChatMessages,
     clearMessages,
   } = useAgentChat();
-
-  // 모델 선택 핸들러
-  const handleModelSelect = useCallback(
-    (model: ModelOption) => {
-      setSelectedModel(model);
-      setModelDropdownOpen(false);
-    },
-    [setSelectedModel],
-  );
 
   // 메시지 큐
   const { queuedMessages, enqueue, remove, dequeue } = useMessageQueue();
@@ -186,50 +176,6 @@ export const AgentContainer = () => {
         </button>
       </header>
 
-      {/* 모델 선택 (메시지가 없을 때만 표시) */}
-      {messages.length === 0 && !isStreaming && (
-        <div className='flex justify-center px-4 pt-4'>
-          <div className='relative'>
-            <button
-              onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-              className='flex items-center gap-1 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50'
-            >
-              {selectedModel.label}
-              <ChevronDown className='h-4 w-4' />
-            </button>
-
-            {modelDropdownOpen && (
-              <>
-                <div
-                  className='fixed inset-0 z-10'
-                  onClick={() => setModelDropdownOpen(false)}
-                />
-                <div className='absolute left-1/2 top-full z-20 mt-1 w-48 -translate-x-1/2 rounded-lg border border-gray-200 bg-white py-1 shadow-lg'>
-                  {AVAILABLE_MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => handleModelSelect(model)}
-                      className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
-                        selectedModel.id === model.id ? 'bg-gray-50' : ''
-                      }`}
-                    >
-                      <span className='text-sm font-medium text-gray-900'>
-                        {model.label}
-                      </span>
-                      {model.description && (
-                        <span className='text-xs text-gray-500'>
-                          {model.description}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 메시지 리스트 */}
       <AgentMessageList
         messages={messages}
@@ -263,6 +209,8 @@ export const AgentContainer = () => {
           isUploading={isUploading}
           onSelectImage={selectImage}
           onClearImage={clearImage}
+          selectedModel={selectedModel}
+          onSelectModel={setSelectedModel}
         />
       </div>
     </div>
