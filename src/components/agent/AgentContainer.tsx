@@ -57,6 +57,24 @@ export const AgentContainer = () => {
   // 메시지 큐
   const { queuedMessages, enqueue, remove, dequeue } = useMessageQueue();
 
+  // 초기 로드: 가장 최근 채팅 자동 로드
+  useEffect(() => {
+    const loadRecentChat = async () => {
+      try {
+        const response = await AgentService.getChatList({ limit: 1 });
+        if (response.chats.length > 0) {
+          const recentChat = response.chats[0];
+          setCurrentChat(recentChat);
+          loadChatMessages(recentChat.id);
+        }
+      } catch (err) {
+        console.error('Failed to load recent chat:', err);
+      }
+    };
+
+    loadRecentChat();
+  }, [setCurrentChat, loadChatMessages]);
+
   // 대화 삭제 뮤테이션
   const deleteChatMutation = useMutation({
     mutationFn: AgentService.deleteChat,
