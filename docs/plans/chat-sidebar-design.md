@@ -1427,5 +1427,313 @@ export const SpinnerIcon = ({ className }: SpinnerIconProps) => (
 
 ---
 
+## 12. 모델 선택 드롭다운
+
+입력창 하단에 LLM 모델을 선택할 수 있는 드롭다운을 제공합니다.
+
+### 12.1 UI 레이아웃
+
+```
+┌─────────────────────────────────────────────────────┐
+│  메시지를 입력하세요...                               │
+├─────────────────────────────────────────────────────┤
+│  GPT-5.2 v              │                           │
+└─────────────────────────────────────────────────────┘
+
+드롭다운 펼침:
+┌─────────────────────────────────────────────────────┐
+│  메시지를 입력하세요...                               │
+├─────────────────────────────────────────────────────┤
+│  GPT-5.2 v              │                           │
+│  ┌─────────────────┐                                │
+│  │ GPT-5.2       ✓ │                                │
+│  │ Gemini 3 Flash  │                                │
+│  └─────────────────┘                                │
+└─────────────────────────────────────────────────────┘
+```
+
+### 12.2 지원 모델 목록
+
+| 모델 ID | 표시 이름 | 설명 |
+|---------|----------|------|
+| `gpt-5.2` | GPT-5.2 | OpenAI GPT-5.2 |
+| `gemini-3-flash` | Gemini 3 Flash | Google Gemini 3.0 Flash |
+
+### 12.3 TypeScript Types
+
+```typescript
+// types/chat.ts
+
+export type ModelId = 'gpt-5.2' | 'gemini-3-flash';
+
+export interface ModelOption {
+  id: ModelId;
+  name: string;
+  description?: string;
+}
+
+export const AVAILABLE_MODELS: ModelOption[] = [
+  { id: 'gpt-5.2', name: 'GPT-5.2' },
+  { id: 'gemini-3-flash', name: 'Gemini 3 Flash' },
+];
+
+export const DEFAULT_MODEL: ModelId = 'gpt-5.2';
+```
+
+### 12.4 ModelSelector 컴포넌트
+
+```typescript
+// components/chat/ModelSelector.tsx
+
+import { useState, useRef, useEffect } from 'react';
+import { AVAILABLE_MODELS, DEFAULT_MODEL } from '@/types/chat';
+import type { ModelId, ModelOption } from '@/types/chat';
+
+interface ModelSelectorProps {
+  value: ModelId;
+  onChange: (modelId: ModelId) => void;
+  disabled?: boolean;
+}
+
+export const ModelSelector = ({
+  value,
+  onChange,
+  disabled = false,
+}: ModelSelectorProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const selectedModel = AVAILABLE_MODELS.find((m) => m.id === value);
+
+  // 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (modelId: ModelId) => {
+    onChange(modelId);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      {/* 선택 버튼 */}
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors ${
+          disabled
+            ? 'cursor-not-allowed text-[#666]'
+            : 'text-[#ccc] hover:bg-[#333] hover:text-white'
+        }`}
+      >
+        <span>{selectedModel?.name || 'Select Model'}</span>
+        <ChevronIcon
+          className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {/* 드롭다운 메뉴 */}
+      {isOpen && (
+        <div className="absolute bottom-full left-0 mb-1 min-w-[160px] rounded-lg border border-[#444] bg-[#2a2a2a] py-1 shadow-lg">
+          {AVAILABLE_MODELS.map((model) => (
+            <button
+              key={model.id}
+              onClick={() => handleSelect(model.id)}
+              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
+                model.id === value
+                  ? 'bg-[#333] text-white'
+                  : 'text-[#ccc] hover:bg-[#333] hover:text-white'
+              }`}
+            >
+              <span>{model.name}</span>
+              {model.id === value && (
+                <CheckIcon className="h-4 w-4 text-white" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 아이콘 컴포넌트
+const ChevronIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+    <path
+      fillRule="evenodd"
+      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
+const CheckIcon = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+    <path
+      fillRule="evenodd"
+      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+```
+
+### 12.5 ChatInputBar 통합
+
+```typescript
+// components/chat/ChatInputBar.tsx
+
+import { useState } from 'react';
+import { ModelSelector } from './ModelSelector';
+import { DEFAULT_MODEL } from '@/types/chat';
+import type { ModelId } from '@/types/chat';
+
+interface ChatInputBarProps {
+  onSend: (text: string, imageUrl?: string, model?: ModelId) => Promise<void>;
+  isDisabled: boolean;
+  // ... 기존 props
+}
+
+const ChatInputBar = ({ onSend, isDisabled, ... }: ChatInputBarProps) => {
+  const [text, setText] = useState('');
+  const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL);
+
+  const handleSend = async () => {
+    if (isDisabled || !text.trim()) return;
+
+    const currentText = text;
+    setText('');
+
+    await onSend(currentText, undefined, selectedModel);
+  };
+
+  return (
+    <div className="border-t border-[#333] bg-[#1a1a1a]">
+      {/* 입력 영역 */}
+      <div className="px-4 py-3">
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="메시지를 입력하세요..."
+          disabled={isDisabled}
+          className="w-full bg-transparent text-white placeholder-[#666] outline-none"
+        />
+      </div>
+
+      {/* 하단 툴바 */}
+      <div className="flex items-center justify-between border-t border-[#333] px-4 py-2">
+        {/* 좌측: 모델 선택 */}
+        <ModelSelector
+          value={selectedModel}
+          onChange={setSelectedModel}
+          disabled={isDisabled}
+        />
+
+        {/* 우측: 전송 버튼 등 */}
+        <button
+          onClick={handleSend}
+          disabled={isDisabled || !text.trim()}
+          className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-black disabled:opacity-50"
+        >
+          전송
+        </button>
+      </div>
+    </div>
+  );
+};
+```
+
+### 12.6 API 요청에 모델 포함
+
+```typescript
+// api/services/chat/chat.service.ts
+
+export interface SubmitMessageRequest {
+  message: string;
+  image_url?: string;
+  model?: string;  // 모델 ID 추가
+}
+
+export class ChatService {
+  static async submitMessage(
+    chatId: string,
+    request: SubmitMessageRequest
+  ) {
+    return api
+      .post(`/api/v1/chat/${chatId}/messages`, request)
+      .then((res) => res.data);
+  }
+}
+```
+
+### 12.7 상태 관리 (선택된 모델 유지)
+
+```typescript
+// hooks/useModelSelection.ts
+
+import { useState, useCallback } from 'react';
+import { DEFAULT_MODEL } from '@/types/chat';
+import type { ModelId } from '@/types/chat';
+
+const STORAGE_KEY = 'chat_selected_model';
+
+export const useModelSelection = () => {
+  // 로컬 스토리지에서 초기값 로드
+  const [selectedModel, setSelectedModel] = useState<ModelId>(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return (stored as ModelId) || DEFAULT_MODEL;
+  });
+
+  const changeModel = useCallback((modelId: ModelId) => {
+    setSelectedModel(modelId);
+    localStorage.setItem(STORAGE_KEY, modelId);
+  }, []);
+
+  return {
+    selectedModel,
+    changeModel,
+  };
+};
+```
+
+### 12.8 백엔드 연동
+
+백엔드 `SubmitChatRequest`에 `model` 필드가 이미 존재합니다:
+
+```python
+# apps/chat/presentation/http/controllers/chat.py
+
+class SendMessageRequest(BaseModel):
+    message: str
+    image_url: HttpUrl | None = None
+    user_location: UserLocation | None = None
+    model: str | None = None  # LLM 모델 override
+```
+
+프론트엔드에서 전송 시:
+
+```typescript
+await ChatService.submitMessage(chatId, {
+  message: text,
+  model: selectedModel,  // 'gpt-5.2' or 'gemini-3-flash'
+});
+```
+
+---
+
 **작성일**: 2026-01-19
 **상태**: 설계 완료
