@@ -6,19 +6,21 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AgentService } from '@/api/services/agent';
 import type { ChatSummary } from '@/api/services/agent';
-import { stripMarkdown } from '@/utils/stripMarkdown';
 import { useAgentChat, useMessageQueue } from '@/hooks/agent';
 import type { QueuedMessage } from '@/hooks/agent/useMessageQueue';
 import { AgentSidebar } from './sidebar';
 import { AgentMessageList } from './AgentMessageList';
 import { AgentInputBar } from './AgentInputBar';
 import { AgentMessageQueue } from './AgentMessageQueue';
+import GoBack from '@/assets/icons/go_back.svg';
 
 export const AgentContainer = () => {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -165,13 +167,16 @@ export const AgentContainer = () => {
       )}
 
       {/* 헤더 */}
-      <header className='border-stroke-default flex items-center justify-between border-b bg-white px-4 py-3'>
-        <h1 className='text-text-primary truncate text-sm font-medium'>
-          {stripMarkdown(currentChat?.title || '') || '새 대화'}
-        </h1>
+      <header className='flex items-center justify-between bg-white px-4 py-3'>
+        <button
+          onClick={() => navigate(-1)}
+          className='flex h-8 w-8 items-center justify-center'
+        >
+          <img src={GoBack} alt='뒤로가기' className='h-6 w-6' />
+        </button>
         <button
           onClick={() => setSidebarOpen(true)}
-          className='text-text-primary rounded p-2 transition-colors hover:bg-gray-100'
+          className='text-text-primary flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-gray-100'
         >
           <Menu className='h-5 w-5' />
         </button>

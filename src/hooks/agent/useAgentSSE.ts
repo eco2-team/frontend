@@ -194,11 +194,13 @@ export const useAgentSSE = (
 
     // Done event
     es.addEventListener('done', (e) => {
+      // 항상 스트리밍 종료 (파싱 실패해도)
+      cleanup();
+      setIsStreaming(false);
+      setCurrentStage(null);
+
       try {
         const data: DoneEvent = JSON.parse((e as MessageEvent).data);
-        cleanup();
-        setIsStreaming(false);
-        setCurrentStage(null);
 
         if (data.status === 'completed') {
           onCompleteRef.current?.(data.result);

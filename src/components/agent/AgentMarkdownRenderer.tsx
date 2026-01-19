@@ -1,24 +1,26 @@
 /**
  * Agent 마크다운 렌더러
+ * - Vercel Streamdown 사용 (스트리밍 최적화)
  * - 라이트 테마 적용
  */
 
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import type { Components } from 'react-markdown';
+import { Streamdown } from 'streamdown';
+import type { ComponentType, JSX } from 'react';
 import { AgentCodeBlock } from './AgentCodeBlock';
 import { AgentImage } from './AgentImage';
 
-// highlight.js 테마 (라이트)
-import 'highlight.js/styles/github.css';
-
 interface AgentMarkdownRendererProps {
   content: string;
+  isStreaming?: boolean;
 }
+
+type Components = {
+  [Key in keyof JSX.IntrinsicElements]?: ComponentType<JSX.IntrinsicElements[Key]> | keyof JSX.IntrinsicElements;
+};
 
 export const AgentMarkdownRenderer = ({
   content,
+  isStreaming = false,
 }: AgentMarkdownRendererProps) => {
   const components: Components = {
     // 코드 블록
@@ -156,13 +158,14 @@ export const AgentMarkdownRenderer = ({
 
   return (
     <div className='max-w-none'>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
+      <Streamdown
         components={components}
+        isAnimating={isStreaming}
+        controls={false}
+        linkSafety={{ enabled: false }}
       >
         {content}
-      </ReactMarkdown>
+      </Streamdown>
     </div>
   );
 };

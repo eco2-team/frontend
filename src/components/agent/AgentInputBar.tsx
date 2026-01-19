@@ -114,15 +114,59 @@ export const AgentInputBar = ({
       )}
 
       {/* 입력바 */}
-      <div className='flex w-full items-center gap-2'>
-        {/* 갤러리 버튼 */}
-        <button
-          onClick={() => galleryInputRef.current?.click()}
-          className='flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100'
-          title='갤러리'
-        >
-          <Image className='h-6 w-6' />
-        </button>
+      <div className='flex w-full items-end gap-2'>
+        {/* 모델 선택 + 갤러리 버튼 */}
+        <div className='relative flex flex-col items-center'>
+          {/* 모델 선택 버튼 */}
+          <button
+            onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
+            className='flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100'
+          >
+            {selectedModel.label}
+            <ChevronUp
+              className={`h-2.5 w-2.5 transition-transform ${modelDropdownOpen ? '' : 'rotate-180'}`}
+            />
+          </button>
+
+          {/* 모델 드롭다운 */}
+          {modelDropdownOpen && (
+            <>
+              <div
+                className='fixed inset-0 z-10'
+                onClick={() => setModelDropdownOpen(false)}
+              />
+              <div className='absolute bottom-full left-0 z-20 mb-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg'>
+                {AVAILABLE_MODELS.map((model) => (
+                  <button
+                    key={model.id}
+                    onClick={() => handleModelSelect(model)}
+                    className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
+                      selectedModel.id === model.id ? 'bg-gray-50' : ''
+                    }`}
+                  >
+                    <span className='text-sm font-medium text-gray-900'>
+                      {model.label}
+                    </span>
+                    {model.description && (
+                      <span className='text-xs text-gray-500'>
+                        {model.description}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* 갤러리 버튼 */}
+          <button
+            onClick={() => galleryInputRef.current?.click()}
+            className='flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100'
+            title='갤러리'
+          >
+            <Image className='h-6 w-6' />
+          </button>
+        </div>
 
         {/* 입력창 */}
         <div className='flex-1'>
@@ -153,48 +197,6 @@ export const AgentInputBar = ({
               className='h-[38px] w-[38px]'
             />
           </button>
-        )}
-      </div>
-
-      {/* 모델 선택 */}
-      <div className='relative flex justify-start pl-1'>
-        <button
-          onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-          className='flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-500 transition-colors hover:bg-gray-100'
-        >
-          {selectedModel.label}
-          <ChevronUp
-            className={`h-3 w-3 transition-transform ${modelDropdownOpen ? '' : 'rotate-180'}`}
-          />
-        </button>
-
-        {modelDropdownOpen && (
-          <>
-            <div
-              className='fixed inset-0 z-10'
-              onClick={() => setModelDropdownOpen(false)}
-            />
-            <div className='absolute bottom-full left-0 z-20 mb-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg'>
-              {AVAILABLE_MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  onClick={() => handleModelSelect(model)}
-                  className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
-                    selectedModel.id === model.id ? 'bg-gray-50' : ''
-                  }`}
-                >
-                  <span className='text-sm font-medium text-gray-900'>
-                    {model.label}
-                  </span>
-                  {model.description && (
-                    <span className='text-xs text-gray-500'>
-                      {model.description}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </>
         )}
       </div>
     </div>
