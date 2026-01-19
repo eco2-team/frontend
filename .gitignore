@@ -22,6 +22,9 @@ dist-ssr
 !.yarn/releases
 !.yarn/versions
 
+# Documentation (local only)
+docs/plans/
+
 # Editor directories and files
 .idea
 .DS_Store
