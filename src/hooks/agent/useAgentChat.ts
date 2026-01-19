@@ -233,10 +233,12 @@ export const useAgentChat = (
 
         // 메시지 전송
         const response = await AgentService.sendMessage(chatId, requestData);
+        console.log('[DEBUG] sendMessage response:', response);
 
         if (!isMountedRef.current) return;
 
         // SSE 연결
+        console.log('[DEBUG] Connecting to SSE with job_id:', response.job_id);
         connectSSE(response.job_id);
       } catch (err) {
         if (!isMountedRef.current) return;

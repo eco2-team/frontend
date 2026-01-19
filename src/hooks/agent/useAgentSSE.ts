@@ -169,6 +169,7 @@ export const useAgentSSE = (
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL;
     const url = `${baseUrl}/api/v1/chat/${jobId}/events`;
+    console.log('[DEBUG] Creating EventSource with URL:', url);
     const es = new EventSource(url, { withCredentials: true });
     eventSourceRef.current = es;
 
@@ -176,6 +177,7 @@ export const useAgentSSE = (
     const handleProgress = (e: Event) => {
       try {
         const data: ProgressEvent = JSON.parse((e as MessageEvent).data);
+        console.log('[DEBUG] Progress event:', data.stage, data.status);
         const stage: CurrentStage = {
           stage: data.stage,
           status: data.status,
@@ -204,6 +206,7 @@ export const useAgentSSE = (
     es.addEventListener('token', (e) => {
       try {
         const data: TokenEvent = JSON.parse((e as MessageEvent).data);
+        console.log('[DEBUG] Token received:', data.content);
         accumulatedTextRef.current += data.content;
         setStreamingText(accumulatedTextRef.current);
         onTokenRef.current?.(data.content);
@@ -232,6 +235,7 @@ export const useAgentSSE = (
 
     // Done event
     es.addEventListener('done', (e) => {
+      console.log('[DEBUG] Done event received');
       // 항상 스트리밍 종료 (파싱 실패해도)
       cleanup();
       setIsStreaming(false);
@@ -239,6 +243,7 @@ export const useAgentSSE = (
 
       try {
         const data: DoneEvent = JSON.parse((e as MessageEvent).data);
+        console.log('[DEBUG] Done event data:', data);
 
         if (data.status === 'completed') {
           onCompleteRef.current?.(data.result);
@@ -303,6 +308,7 @@ export const useAgentSSE = (
 
     // Connection opened
     es.onopen = () => {
+      console.log('[DEBUG] SSE connection opened');
       reconnectAttemptRef.current = 0;
       // 연결 후 첫 이벤트 타임아웃 시작
       resetEventTimeout(DEFAULT_EVENT_TIMEOUT);
