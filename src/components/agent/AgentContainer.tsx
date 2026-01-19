@@ -57,8 +57,12 @@ export const AgentContainer = () => {
   // 메시지 큐
   const { queuedMessages, enqueue, remove, dequeue } = useMessageQueue();
 
-  // 초기 로드: 가장 최근 채팅 자동 로드
+  // 초기 로드: 가장 최근 채팅 자동 로드 (마운트 시 1회만)
+  const initialLoadDone = useRef(false);
   useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
     const loadRecentChat = async () => {
       try {
         const response = await AgentService.getChatList({ limit: 1 });
@@ -73,7 +77,8 @@ export const AgentContainer = () => {
     };
 
     loadRecentChat();
-  }, [setCurrentChat, loadChatMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 대화 삭제 뮤테이션
   const deleteChatMutation = useMutation({
