@@ -1434,21 +1434,22 @@ export const SpinnerIcon = ({ className }: SpinnerIconProps) => (
 ### 12.1 UI 레이아웃
 
 ```
+기본 상태:
 ┌─────────────────────────────────────────────────────┐
-│  메시지를 입력하세요...                               │
+│  무엇이든 부탁하세요                                  │
 ├─────────────────────────────────────────────────────┤
-│  GPT-5.2 v              │                           │
+│  +  (icons...)                        GPT-5.2       │
 └─────────────────────────────────────────────────────┘
 
-드롭다운 펼침:
+클릭 시 (상단으로 메뉴 표시):
+                              ┌─────────────────────┐
+                              │ GPT-5.2           ✓ │
+                              │ Gemini 3 Flash      │
+                              └─────────────────────┘
 ┌─────────────────────────────────────────────────────┐
-│  메시지를 입력하세요...                               │
+│  무엇이든 부탁하세요                                  │
 ├─────────────────────────────────────────────────────┤
-│  GPT-5.2 v              │                           │
-│  ┌─────────────────┐                                │
-│  │ GPT-5.2       ✓ │                                │
-│  │ Gemini 3 Flash  │                                │
-│  └─────────────────┘                                │
+│  +  (icons...)                        GPT-5.2       │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -1486,8 +1487,8 @@ export const DEFAULT_MODEL: ModelId = 'gpt-5.2';
 // components/chat/ModelSelector.tsx
 
 import { useState, useRef, useEffect } from 'react';
-import { AVAILABLE_MODELS, DEFAULT_MODEL } from '@/types/chat';
-import type { ModelId, ModelOption } from '@/types/chat';
+import { AVAILABLE_MODELS } from '@/types/chat';
+import type { ModelId } from '@/types/chat';
 
 interface ModelSelectorProps {
   value: ModelId;
@@ -1501,7 +1502,7 @@ export const ModelSelector = ({
   disabled = false,
 }: ModelSelectorProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedModel = AVAILABLE_MODELS.find((m) => m.id === value);
 
@@ -1509,8 +1510,8 @@ export const ModelSelector = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
       ) {
         setIsOpen(false);
       }
@@ -1526,36 +1527,29 @@ export const ModelSelector = ({
   };
 
   return (
-    <div ref={dropdownRef} className="relative">
-      {/* 선택 버튼 */}
+    <div ref={containerRef} className="relative">
+      {/* 선택 버튼 - 텍스트만, 화살표 없음 */}
       <button
         type="button"
         onClick={() => !disabled && setIsOpen(!isOpen)}
         disabled={disabled}
-        className={`flex items-center gap-1 rounded-md px-2 py-1 text-sm transition-colors ${
+        className={`text-sm transition-colors ${
           disabled
             ? 'cursor-not-allowed text-[#666]'
-            : 'text-[#ccc] hover:bg-[#333] hover:text-white'
+            : 'text-[#888] hover:text-white'
         }`}
       >
-        <span>{selectedModel?.name || 'Select Model'}</span>
-        <ChevronIcon
-          className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-        />
+        {selectedModel?.name || 'Model'}
       </button>
 
-      {/* 드롭다운 메뉴 */}
+      {/* 팝업 메뉴 - 상단으로 표시 */}
       {isOpen && (
-        <div className="absolute bottom-full left-0 mb-1 min-w-[160px] rounded-lg border border-[#444] bg-[#2a2a2a] py-1 shadow-lg">
+        <div className="absolute bottom-full right-0 mb-2 min-w-[180px] rounded-xl border border-[#444] bg-[#2a2a2a] py-2 shadow-xl">
           {AVAILABLE_MODELS.map((model) => (
             <button
               key={model.id}
               onClick={() => handleSelect(model.id)}
-              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
-                model.id === value
-                  ? 'bg-[#333] text-white'
-                  : 'text-[#ccc] hover:bg-[#333] hover:text-white'
-              }`}
+              className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors text-[#ccc] hover:bg-[#333]"
             >
               <span>{model.name}</span>
               {model.id === value && (
@@ -1568,17 +1562,6 @@ export const ModelSelector = ({
     </div>
   );
 };
-
-// 아이콘 컴포넌트
-const ChevronIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 20 20" fill="currentColor">
-    <path
-      fillRule="evenodd"
-      d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-      clipRule="evenodd"
-    />
-  </svg>
-);
 
 const CheckIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 20 20" fill="currentColor">
@@ -1604,19 +1587,16 @@ import type { ModelId } from '@/types/chat';
 interface ChatInputBarProps {
   onSend: (text: string, imageUrl?: string, model?: ModelId) => Promise<void>;
   isDisabled: boolean;
-  // ... 기존 props
 }
 
-const ChatInputBar = ({ onSend, isDisabled, ... }: ChatInputBarProps) => {
+const ChatInputBar = ({ onSend, isDisabled }: ChatInputBarProps) => {
   const [text, setText] = useState('');
   const [selectedModel, setSelectedModel] = useState<ModelId>(DEFAULT_MODEL);
 
   const handleSend = async () => {
     if (isDisabled || !text.trim()) return;
-
     const currentText = text;
     setText('');
-
     await onSend(currentText, undefined, selectedModel);
   };
 
@@ -1628,29 +1608,26 @@ const ChatInputBar = ({ onSend, isDisabled, ... }: ChatInputBarProps) => {
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="메시지를 입력하세요..."
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          placeholder="무엇이든 부탁하세요"
           disabled={isDisabled}
           className="w-full bg-transparent text-white placeholder-[#666] outline-none"
         />
       </div>
 
       {/* 하단 툴바 */}
-      <div className="flex items-center justify-between border-t border-[#333] px-4 py-2">
-        {/* 좌측: 모델 선택 */}
+      <div className="flex items-center justify-between px-4 py-2">
+        {/* 좌측: 기타 아이콘들 (추후 확장) */}
+        <div className="flex items-center gap-3">
+          {/* + 버튼, 웹검색 등 */}
+        </div>
+
+        {/* 우측: 모델 선택 (텍스트만) */}
         <ModelSelector
           value={selectedModel}
           onChange={setSelectedModel}
           disabled={isDisabled}
         />
-
-        {/* 우측: 전송 버튼 등 */}
-        <button
-          onClick={handleSend}
-          disabled={isDisabled || !text.trim()}
-          className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-black disabled:opacity-50"
-        >
-          전송
-        </button>
       </div>
     </div>
   );
