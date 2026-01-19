@@ -309,6 +309,10 @@ export const useAgentChat = (
 
   // 채팅 메시지 로드 (채팅 선택 시)
   const loadChatMessages = useCallback(async (chatId: string) => {
+    // 이전 채팅 상태 초기화 (중요: API 호출 전에 리셋)
+    setMessages([]);
+    setHasMoreHistory(false);
+    setHistoryCursor(null);
     setIsLoadingHistory(true);
     setError(null);
 
