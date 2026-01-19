@@ -10,6 +10,7 @@ import { Menu } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AgentService } from '@/api/services/agent';
 import type { ChatSummary } from '@/api/services/agent';
+import { stripMarkdown } from '@/utils/stripMarkdown';
 import { useAgentChat, useMessageQueue } from '@/hooks/agent';
 import type { QueuedMessage } from '@/hooks/agent/useMessageQueue';
 import { AgentSidebar } from './sidebar';
@@ -165,8 +166,8 @@ export const AgentContainer = () => {
 
       {/* 헤더 */}
       <header className='border-stroke-default flex items-center justify-between border-b bg-white px-4 py-3'>
-        <h1 className='text-text-primary text-sm font-medium'>
-          {currentChat?.title || '새 대화'}
+        <h1 className='text-text-primary truncate text-sm font-medium'>
+          {stripMarkdown(currentChat?.title || '') || '새 대화'}
         </h1>
         <button
           onClick={() => setSidebarOpen(true)}

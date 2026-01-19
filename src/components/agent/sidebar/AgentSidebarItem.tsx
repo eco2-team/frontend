@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, MoreVertical, Pencil, Trash2, Check, X } from 'lucide-react';
 import type { ChatSummary } from '@/api/services/agent';
+import { stripMarkdown } from '@/utils/stripMarkdown';
 
 interface AgentSidebarItemProps {
   item: ChatSummary;
@@ -132,7 +133,7 @@ export const AgentSidebarItem = ({
           <p
             className={`truncate text-sm ${isActive ? 'text-brand-primary font-medium' : 'text-text-primary'}`}
           >
-            {item.title || item.preview || '새 대화'}
+            {stripMarkdown(item.title || item.preview || '') || '새 대화'}
           </p>
         </div>
         <span className='text-text-inactive flex-shrink-0 text-xs'>
