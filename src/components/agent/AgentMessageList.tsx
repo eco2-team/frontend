@@ -3,7 +3,7 @@
  * - Chat UI 스타일 적용 (이코 캐릭터, 라이트 테마)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 import EcoImg from '@/assets/images/mainCharacter/main_1.png';
 import type {
@@ -46,6 +46,9 @@ export const AgentMessageList = ({
   const { containerRef, showScrollButton, scrollToBottom, isAtBottom } =
     useScrollToBottom();
 
+  // 이전 스트리밍 상태 추적
+  const wasStreamingRef = useRef(false);
+
   // 위로 스크롤 시 이전 메시지 로드
   const handleScroll = () => {
     if (!containerRef.current || !hasMoreHistory || isLoadingHistory) return;
@@ -64,19 +67,21 @@ export const AgentMessageList = ({
     }
   }, [messages, isAtBottom, scrollToBottom]);
 
-  // 스트리밍 중 자동 스크롤 (항상)
+  // 스트리밍 시작 시 강제 스크롤 (... 나올 때)
+  useEffect(() => {
+    // false → true 변경 시에만 스크롤
+    if (isStreaming && !wasStreamingRef.current) {
+      scrollToBottom('smooth');
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming, scrollToBottom]);
+
+  // 스트리밍 중 자동 스크롤 (텍스트 업데이트 시)
   useEffect(() => {
     if (isStreaming && streamingText) {
       scrollToBottom('auto');
     }
   }, [isStreaming, streamingText, scrollToBottom]);
-
-  // 스트리밍 시작 시 스크롤
-  useEffect(() => {
-    if (isStreaming) {
-      scrollToBottom('auto');
-    }
-  }, [isStreaming, scrollToBottom]);
 
   return (
     <div
