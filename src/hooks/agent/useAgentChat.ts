@@ -230,6 +230,12 @@ export const useAgentChat = (
           user_location: userLocation,
           model: selectedModel.id,
         };
+        console.log('[DEBUG] sendMessage request:', {
+          chatId,
+          message,
+          user_location: userLocation,
+          model: selectedModel.id,
+        });
 
         // 메시지 전송
         const response = await AgentService.sendMessage(chatId, requestData);
