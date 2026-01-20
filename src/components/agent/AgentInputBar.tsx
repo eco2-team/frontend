@@ -6,7 +6,7 @@
  * - 모델 선택 지원
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Loader2, Image, Square, ChevronUp } from 'lucide-react';
 import { AVAILABLE_MODELS } from '@/api/services/agent';
 import type { ModelOption } from '@/api/services/agent';
@@ -45,6 +45,15 @@ export const AgentInputBar = ({
   const [text, setText] = useState('');
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // textarea 자동 높이 조절
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  }, [text]);
 
   // 스트리밍 또는 로딩 중인지
   const isBusy = isStreaming || isLoading;
@@ -170,13 +179,14 @@ export const AgentInputBar = ({
 
         {/* 입력창 */}
         <div className='flex-1'>
-          <input
-            type='text'
-            className='border-stroke-default bg-inactive placeholder:text-text-inactive w-full rounded-[60px] border px-4 py-2 text-sm leading-normal font-normal outline-none'
+          <textarea
+            ref={textareaRef}
+            className='border-stroke-default bg-inactive placeholder:text-text-inactive w-full resize-none rounded-[20px] border px-4 py-2 text-sm leading-normal font-normal outline-none'
             placeholder='메시지를 입력하세요...'
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
+            rows={1}
           />
         </div>
 
