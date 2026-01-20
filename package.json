@@ -15,6 +15,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.90.11",
     "axios": "^1.13.2",
+    "idb": "^8.0.3",
     "path": "^0.12.7",
     "react": "^19.1.1",
     "react-activation": "^0.13.4",

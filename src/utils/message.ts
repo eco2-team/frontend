@@ -89,37 +89,82 @@ export const updateMessageStatus = (
 });
 
 /**
- * 메시지 목록 reconcile (서버 데이터와 로컬 데이터 병합)
- * - 서버에 있는 메시지: committed로 업데이트
- * - 로컬에만 있는 pending/streaming 메시지: 유지
- * - 중복 제거 (server_id 또는 client_id 기준)
+ * 메시지 목록 reconcile (Eventual Consistency 대응)
+ * - 서버 메시지: committed로 변환
+ * - 로컬 pending/streaming: 항상 유지
+ * - 로컬 committed (서버 없음): retention 기간 내 유지
+ * - 중복 제거: server_id 우선, client_id 대체
  */
 export const reconcileMessages = (
   localMessages: AgentMessage[],
   serverMessages: ServerMessage[],
+  options: {
+    /** Committed 메시지 유지 기간 (ms) - 기본 30초 */
+    committedRetentionMs?: number;
+  } = {},
 ): AgentMessage[] => {
-  // 서버 메시지를 client 메시지로 변환
+  const { committedRetentionMs = 30000 } = options;
+
+  // 서버 메시지 변환
   const serverConverted = serverMessages.map(serverToClientMessage);
 
-  // 서버 메시지 ID Set (빠른 조회용)
-  const serverIdSet = new Set(serverMessages.map((m) => m.id));
+  // 서버 메시지 ID Map (중복 체크용)
+  const serverIdMap = new Map(serverMessages.map((m) => [m.id, m]));
 
-  // 로컬에만 있는 pending/streaming 메시지 필터링
-  // (아직 서버에 커밋되지 않은 메시지)
-  const pendingLocal = localMessages.filter(
-    (local) =>
-      (local.status === 'pending' || local.status === 'streaming') &&
-      !local.server_id &&
-      !serverIdSet.has(local.client_id),
-  );
+  // 현재 시간
+  const now = new Date().getTime();
 
-  // 서버 메시지 + 로컬 pending 메시지 병합
+  // 로컬 메시지 분류
+  const localToKeep = localMessages.filter((local) => {
+    // 서버에 있으면 제외 (서버 버전 사용)
+    if (local.server_id && serverIdMap.has(local.server_id)) {
+      return false;
+    }
+    if (serverIdMap.has(local.client_id)) {
+      return false;
+    }
+
+    // pending/streaming은 항상 유지
+    if (local.status === 'pending' || local.status === 'streaming') {
+      return true;
+    }
+
+    // committed는 retention 기간 내면 유지 (Eventual Consistency 버퍼)
+    if (local.status === 'committed' && !local.server_id) {
+      const age = now - new Date(local.created_at).getTime();
+      return age < committedRetentionMs;
+    }
+
+    // failed는 유지 (사용자가 재시도 가능)
+    if (local.status === 'failed') {
+      return true;
+    }
+
+    return false;
+  });
+
+  // 병합
+  const merged = [...serverConverted, ...localToKeep];
+
+  // 중복 제거 (server_id 우선)
+  const deduped = new Map<string, AgentMessage>();
+  merged.forEach((msg) => {
+    const key = msg.server_id || msg.client_id;
+    if (!deduped.has(key)) {
+      deduped.set(key, msg);
+    } else {
+      // 이미 있으면 server_id 있는 것 우선
+      const existing = deduped.get(key)!;
+      if (msg.server_id && !existing.server_id) {
+        deduped.set(key, msg);
+      }
+    }
+  });
+
   // 시간순 정렬
-  const merged = [...serverConverted, ...pendingLocal].sort(
+  return Array.from(deduped.values()).sort(
     (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
-
-  return merged;
 };
 
 /**

@@ -25,9 +25,11 @@ import {
   reconcileMessages,
   serverToClientMessage,
 } from '@/utils/message';
+import { messageDB } from '@/db/messageDB';
 import { useAgentSSE } from './useAgentSSE';
 import { useAgentLocation } from './useAgentLocation';
 import { useImageUpload } from './useImageUpload';
+import { useMessagePersistence } from './useMessagePersistence';
 
 interface UseAgentChatOptions {
   onMessageComplete?: (result: DoneEvent['result']) => void;
@@ -123,6 +125,9 @@ export const useAgentChat = (
     console.log('[DEBUG] userLocation updated:', userLocation);
   }, [userLocation]);
 
+  // IndexedDB 자동 저장 (500ms throttle + 1분 cleanup)
+  useMessagePersistence(currentChat?.id || null, messages);
+
   // 이미지
   const {
     selectedImage,
@@ -148,6 +153,18 @@ export const useAgentChat = (
             pendingUserMessageIdRef.current,
             (msg) => updateMessageStatus(msg, 'committed'),
           );
+
+          // IndexedDB 동기화
+          if (currentChatRef.current?.id) {
+            messageDB
+              .updateMessageStatus(
+                pendingUserMessageIdRef.current,
+                'committed',
+                result.persistence?.user_message,
+              )
+              .catch(console.error);
+          }
+
           pendingUserMessageIdRef.current = null;
         }
 
@@ -376,32 +393,48 @@ export const useAgentChat = (
     pendingUserMessageIdRef.current = null;
   }, []);
 
-  // 채팅 메시지 로드 (채팅 선택 시) - Reconcile 방식
+  // 채팅 메시지 로드 (채팅 선택 시) - IndexedDB 우선 + Reconcile
   const loadChatMessages = useCallback(async (chatId: string) => {
     setIsLoadingHistory(true);
     setError(null);
 
     try {
+      // 1. IndexedDB에서 먼저 로드 (즉시 표시)
+      const localMessages = await messageDB.getMessages(chatId);
+      if (localMessages.length > 0) {
+        console.log(`[IndexedDB] Loaded ${localMessages.length} messages from cache`);
+        setMessages(localMessages);
+      }
+
+      // 2. 서버 조회 (백그라운드)
       const response = await AgentService.getChatDetail(chatId, {
         limit: 20,
       });
 
-      // Reconcile: 서버 데이터와 로컬 pending 메시지 병합
+      // 3. Reconcile: 로컬 + 서버 병합
       setMessages((prev) => {
-        // 다른 채팅으로 전환 시에는 pending 메시지 유지하지 않음
-        // (같은 채팅에서만 reconcile 의미 있음)
         const currentChatId = currentChatRef.current?.id;
+
+        // 다른 채팅으로 전환: 서버 데이터만
         if (currentChatId !== chatId) {
-          // 다른 채팅으로 전환: 서버 데이터만 사용
           return response.messages.map(serverToClientMessage);
         }
-        // 같은 채팅: reconcile (pending 메시지 유지)
-        return reconcileMessages(prev, response.messages);
+
+        // 같은 채팅: reconcile (로컬 pending + committed 30초 유지)
+        const merged = reconcileMessages(
+          prev.length > 0 ? prev : localMessages,
+          response.messages,
+          { committedRetentionMs: 30000 },
+        );
+
+        return merged;
       });
 
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
     } catch (err) {
+      console.error('[loadChatMessages] Server fetch failed:', err);
+      // 에러 시 IndexedDB 데이터 유지
       const loadError =
         err instanceof Error ? err : new Error('Failed to load messages');
       setError(loadError);
@@ -411,7 +444,7 @@ export const useAgentChat = (
     }
   }, [onError]);
 
-  // 이전 메시지 더 로드 (위로 스크롤 시)
+  // 이전 메시지 더 로드 (위로 스크롤 시) - Reconcile 적용
   const loadMoreMessages = useCallback(async () => {
     if (!currentChat?.id || !hasMoreHistory || isLoadingHistory) return;
 
@@ -423,9 +456,13 @@ export const useAgentChat = (
         cursor: historyCursor ?? undefined,
       });
 
-      // 서버 메시지를 클라이언트 형식으로 변환 후 앞에 추가
-      const serverMessages = response.messages.map(serverToClientMessage);
-      setMessages((prev) => [...serverMessages, ...prev]);
+      // Reconcile로 병합 (로컬 pending/committed 유지)
+      setMessages((prev) =>
+        reconcileMessages(prev, response.messages, {
+          committedRetentionMs: 30000,
+        }),
+      );
+
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
     } catch (err) {
