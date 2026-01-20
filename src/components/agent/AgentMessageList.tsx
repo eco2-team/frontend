@@ -62,14 +62,21 @@ export const AgentMessageList = ({
     if (isAtBottom) {
       scrollToBottom('auto');
     }
-  }, [messages, streamingText, isAtBottom, scrollToBottom]);
+  }, [messages, isAtBottom, scrollToBottom]);
+
+  // 스트리밍 중 자동 스크롤 (항상)
+  useEffect(() => {
+    if (isStreaming && streamingText) {
+      scrollToBottom('auto');
+    }
+  }, [isStreaming, streamingText, scrollToBottom]);
 
   // 스트리밍 시작 시 스크롤
   useEffect(() => {
-    if (isStreaming && isAtBottom) {
+    if (isStreaming) {
       scrollToBottom('auto');
     }
-  }, [isStreaming, isAtBottom, scrollToBottom]);
+  }, [isStreaming, scrollToBottom]);
 
   return (
     <div
@@ -99,19 +106,6 @@ export const AgentMessageList = ({
             >
               이전 대화 더 보기
             </button>
-          </div>
-        )}
-
-        {/* 빈 상태 - 시작 메시지 */}
-        {messages.length === 0 && !isStreaming && !isLoadingHistory && (
-          <div className='flex w-full flex-row justify-start gap-[7px] pt-[15px]'>
-            <img src={EcoImg} alt='이코' className='h-9 w-9' />
-            <div className='flex w-full flex-col items-start gap-2'>
-              <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)]'>
-                안녕하세요! 저는 이코예요 분리수거에 대해 궁금한게 있으면
-                물어봐주세요!
-              </div>
-            </div>
           </div>
         )}
 
