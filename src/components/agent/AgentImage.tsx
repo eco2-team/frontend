@@ -4,7 +4,7 @@
  * - 길게 누르면 다운로드 옵션 표시
  */
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { ImageOff, Download, Loader2 } from 'lucide-react';
 
 interface AgentImageProps {
@@ -23,6 +23,52 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
   // Long press 감지
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress = useRef(false);
+
+  // 모달 닫기 함수
+  const closeModal = useCallback(() => {
+    setIsExpanded(false);
+    setShowDownload(false);
+    isLongPress.current = false;
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  // ESC 키, 뒤로가기 처리
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+
+    const handlePopState = () => {
+      closeModal();
+    };
+
+    // 모달 열릴 때 히스토리 추가 (뒤로가기 지원)
+    window.history.pushState({ imageModal: true }, '');
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isExpanded, closeModal]);
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
 
   const handleTouchStart = useCallback(() => {
     isLongPress.current = false;
@@ -90,10 +136,7 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
       {isExpanded && (
         <div
           className='fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4'
-          onClick={() => {
-            setIsExpanded(false);
-            setShowDownload(false);
-          }}
+          onClick={closeModal}
         >
           {/* 확대 이미지 (길게 누르면 다운로드 옵션) */}
           <div className='relative'>
@@ -118,8 +161,7 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
                 download
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowDownload(false);
-                  setIsExpanded(false);
+                  closeModal();
                 }}
                 className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 rounded-xl bg-white/90 px-6 py-4 text-gray-700 shadow-lg backdrop-blur-sm transition-all'
               >
