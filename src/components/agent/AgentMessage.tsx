@@ -38,7 +38,7 @@ export const AgentMessage = ({
         )}
         {/* 텍스트 */}
         {message.content && (
-          <div className='border-brand-primary bg-brand-primary max-w-[80%] shrink-0 items-start rounded-[16px_6px_16px_16px] border-[0.676px] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)]'>
+          <div className='border-brand-primary bg-brand-primary max-w-[80%] shrink-0 items-start rounded-[16px_6px_16px_16px] border-[0.676px] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] text-white shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)] break-words whitespace-pre-wrap'>
             {message.content}
           </div>
         )}
@@ -58,7 +58,7 @@ export const AgentMessage = ({
 
       <div className='flex w-full flex-col items-start gap-2'>
         {/* 메시지 버블 */}
-        <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)]'>
+        <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)] break-words'>
           <AgentMarkdownRenderer content={message.content} />
           {/* 스트리밍 커서 */}
           {isStreaming && (
