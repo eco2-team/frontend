@@ -1,8 +1,9 @@
 /**
  * Agent 채팅 통합 훅
+ * - Optimistic Update 지원 (client_id, status 추적)
+ * - Reconcile 방식 데이터 병합
  * - Race condition 방지 (isSendingRef)
- * - 언마운트 후 상태 업데이트 방지
- * - 모델 선택 지원
+ * - 실패 시 롤백/상태 변경
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -16,6 +17,14 @@ import type {
   SendMessageRequest,
 } from '@/api/services/agent';
 import { DEFAULT_MODEL } from '@/api/services/agent';
+import {
+  createUserMessage,
+  createAssistantMessage,
+  updateMessageStatus,
+  updateMessageInList,
+  reconcileMessages,
+  serverToClientMessage,
+} from '@/utils/message';
 import { useAgentSSE } from './useAgentSSE';
 import { useAgentLocation } from './useAgentLocation';
 import { useImageUpload } from './useImageUpload';
@@ -86,6 +95,10 @@ export const useAgentChat = (
   const isSendingRef = useRef(false);
   const isMountedRef = useRef(true);
   const currentChatRef = useRef<ChatSummary | null>(null);
+  // 현재 전송 중인 user 메시지 client_id 추적
+  const pendingUserMessageIdRef = useRef<string | null>(null);
+  // 위치 정보 ref (최신 값 보장)
+  const userLocationRef = useRef<ReturnType<typeof useAgentLocation>['userLocation']>(undefined);
 
   // currentChat 동기화
   useEffect(() => {
@@ -104,6 +117,12 @@ export const useAgentChat = (
   const { userLocation, permissionStatus: locationPermission } =
     useAgentLocation();
 
+  // 위치 정보 동기화 (ref로 최신 값 보장)
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+    console.log('[DEBUG] userLocation updated:', userLocation);
+  }, [userLocation]);
+
   // 이미지
   const {
     selectedImage,
@@ -119,14 +138,34 @@ export const useAgentChat = (
     (result: DoneEvent['result']) => {
       if (!isMountedRef.current) return;
 
-      // Assistant 메시지 추가
-      const assistantMessage: AgentMessage = {
-        id: `msg-${Date.now()}`,
-        role: 'assistant',
-        content: result.answer,
-        created_at: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => {
+        let updated = prev;
+
+        // 1. User 메시지를 committed로 업데이트 (서버 ID 매핑)
+        if (pendingUserMessageIdRef.current) {
+          updated = updateMessageInList(
+            updated,
+            pendingUserMessageIdRef.current,
+            (msg) => updateMessageStatus(msg, 'committed'),
+          );
+          pendingUserMessageIdRef.current = null;
+        }
+
+        // 2. Assistant 메시지 추가 (committed 상태)
+        const assistantMessage = createAssistantMessage(result.answer);
+        assistantMessage.status = 'committed';
+        // 서버에서 온 persistence 정보로 서버 ID 설정
+        if (result.persistence?.assistant_message) {
+          assistantMessage.server_id = result.persistence.assistant_message;
+          assistantMessage.id = result.persistence.assistant_message;
+        }
+        if (result.persistence?.assistant_message_created_at) {
+          assistantMessage.created_at = result.persistence.assistant_message_created_at;
+        }
+
+        return [...updated, assistantMessage];
+      });
+
       onMessageComplete?.(result);
     },
     [onMessageComplete],
@@ -136,6 +175,16 @@ export const useAgentChat = (
   const handleSSEError = useCallback(
     (err: Error) => {
       if (!isMountedRef.current) return;
+
+      // Pending 메시지를 failed로 변경
+      if (pendingUserMessageIdRef.current) {
+        setMessages((prev) =>
+          updateMessageInList(prev, pendingUserMessageIdRef.current!, (msg) =>
+            updateMessageStatus(msg, 'failed'),
+          ),
+        );
+        pendingUserMessageIdRef.current = null;
+      }
 
       setError(err);
       onError?.(err);
@@ -196,6 +245,9 @@ export const useAgentChat = (
       setIsLoading(true);
       setError(null);
 
+      // User 메시지 생성 (Optimistic - pending 상태)
+      let finalImageUrl = imageUrl;
+
       try {
         // 채팅이 없으면 새로 생성 (ref 사용으로 최신 값 보장)
         let chatId = currentChatRef.current?.id;
@@ -205,7 +257,6 @@ export const useAgentChat = (
         }
 
         // 이미지 업로드 (직접 전달된 imageUrl이 없을 때만)
-        let finalImageUrl = imageUrl;
         if (!finalImageUrl && selectedImage) {
           finalImageUrl = (await uploadImage()) ?? undefined;
           clearImage();
@@ -213,27 +264,24 @@ export const useAgentChat = (
 
         if (!isMountedRef.current) return;
 
-        // User 메시지 추가
-        const userMessage: AgentMessage = {
-          id: `msg-${Date.now()}`,
-          role: 'user',
-          content: message,
-          created_at: new Date().toISOString(),
-          image_url: finalImageUrl,
-        };
+        // User 메시지 추가 (Optimistic Update)
+        const userMessage = createUserMessage(message, finalImageUrl);
+        pendingUserMessageIdRef.current = userMessage.client_id;
         setMessages((prev) => [...prev, userMessage]);
 
-        // 요청 데이터 구성
+        // 요청 데이터 구성 (ref에서 최신 위치 정보 가져옴)
+        const currentLocation = userLocationRef.current;
         const requestData: SendMessageRequest = {
           message,
           image_url: finalImageUrl,
-          user_location: userLocation,
+          user_location: currentLocation,
           model: selectedModel.id,
         };
         console.log('[DEBUG] sendMessage request:', {
           chatId,
           message,
-          user_location: userLocation,
+          client_id: userMessage.client_id,
+          user_location: currentLocation,
           model: selectedModel.id,
         });
 
@@ -248,6 +296,17 @@ export const useAgentChat = (
         connectSSE(response.job_id);
       } catch (err) {
         if (!isMountedRef.current) return;
+
+        // 실패 시 메시지를 failed 상태로 변경
+        if (pendingUserMessageIdRef.current) {
+          setMessages((prev) =>
+            updateMessageInList(prev, pendingUserMessageIdRef.current!, (msg) =>
+              updateMessageStatus(msg, 'failed'),
+            ),
+          );
+          pendingUserMessageIdRef.current = null;
+        }
+
         const sendError =
           err instanceof Error ? err : new Error('Failed to send message');
         setError(sendError);
@@ -262,7 +321,6 @@ export const useAgentChat = (
     [
       selectedImage,
       selectedModel,
-      userLocation,
       createNewChat,
       uploadImage,
       clearImage,
@@ -283,7 +341,9 @@ export const useAgentChat = (
   const regenerateMessage = useCallback(
     async (messageId: string) => {
       // 해당 메시지 이전의 마지막 user 메시지 찾기
-      const messageIndex = messages.findIndex((m) => m.id === messageId);
+      const messageIndex = messages.findIndex(
+        (m) => m.id === messageId || m.client_id === messageId,
+      );
       if (messageIndex === -1) return;
 
       // 이전 user 메시지 찾기
@@ -313,14 +373,11 @@ export const useAgentChat = (
     setError(null);
     setHasMoreHistory(false);
     setHistoryCursor(null);
+    pendingUserMessageIdRef.current = null;
   }, []);
 
-  // 채팅 메시지 로드 (채팅 선택 시)
+  // 채팅 메시지 로드 (채팅 선택 시) - Reconcile 방식
   const loadChatMessages = useCallback(async (chatId: string) => {
-    // 이전 채팅 상태 초기화 (중요: API 호출 전에 리셋)
-    setMessages([]);
-    setHasMoreHistory(false);
-    setHistoryCursor(null);
     setIsLoadingHistory(true);
     setError(null);
 
@@ -328,8 +385,20 @@ export const useAgentChat = (
       const response = await AgentService.getChatDetail(chatId, {
         limit: 20,
       });
-      // 백엔드가 오래된 순(ASC)으로 반환
-      setMessages(response.messages);
+
+      // Reconcile: 서버 데이터와 로컬 pending 메시지 병합
+      setMessages((prev) => {
+        // 다른 채팅으로 전환 시에는 pending 메시지 유지하지 않음
+        // (같은 채팅에서만 reconcile 의미 있음)
+        const currentChatId = currentChatRef.current?.id;
+        if (currentChatId !== chatId) {
+          // 다른 채팅으로 전환: 서버 데이터만 사용
+          return response.messages.map(serverToClientMessage);
+        }
+        // 같은 채팅: reconcile (pending 메시지 유지)
+        return reconcileMessages(prev, response.messages);
+      });
+
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
     } catch (err) {
@@ -354,8 +423,9 @@ export const useAgentChat = (
         cursor: historyCursor ?? undefined,
       });
 
-      // 백엔드가 오래된 순(ASC)으로 반환하므로 앞에 추가
-      setMessages((prev) => [...response.messages, ...prev]);
+      // 서버 메시지를 클라이언트 형식으로 변환 후 앞에 추가
+      const serverMessages = response.messages.map(serverToClientMessage);
+      setMessages((prev) => [...serverMessages, ...prev]);
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
     } catch (err) {
