@@ -60,12 +60,18 @@ export const useScrollToBottom = (threshold = 100): UseScrollToBottomReturn => {
     }
   }, [checkScrollImpl]);
 
-  // 하단으로 스크롤
+  // 하단으로 스크롤 (이미 하단이면 스킵)
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     if (!containerRef.current) return;
 
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+    // 이미 하단 근처(30px 이내)면 스크롤 스킵 (바운싱 방지)
+    if (distanceFromBottom <= 30) return;
+
     containerRef.current.scrollTo({
-      top: containerRef.current.scrollHeight,
+      top: scrollHeight,
       behavior,
     });
   }, []);

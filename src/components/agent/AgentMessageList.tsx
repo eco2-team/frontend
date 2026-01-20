@@ -71,15 +71,27 @@ export const AgentMessageList = ({
   useEffect(() => {
     // false → true 변경 시에만 스크롤
     if (isStreaming && !wasStreamingRef.current) {
-      scrollToBottom('smooth');
+      // 강제로 하단 스크롤 (스킵 로직 무시)
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
     }
     wasStreamingRef.current = isStreaming;
-  }, [isStreaming, scrollToBottom]);
+  }, [isStreaming]);
 
-  // 스트리밍 중 자동 스크롤 (텍스트 업데이트 시)
+  // 스트리밍 중 자동 스크롤 (텍스트 업데이트 시) - throttle로 바운싱 방지
+  const lastScrollRef = useRef(0);
   useEffect(() => {
     if (isStreaming && streamingText) {
-      scrollToBottom('auto');
+      const now = Date.now();
+      // 200ms throttle
+      if (now - lastScrollRef.current > 200) {
+        lastScrollRef.current = now;
+        scrollToBottom('auto');
+      }
     }
   }, [isStreaming, streamingText, scrollToBottom]);
 
@@ -87,7 +99,7 @@ export const AgentMessageList = ({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className='no-scrollbar relative flex-1 overflow-y-auto bg-white'
+      className='no-scrollbar relative flex-1 overflow-y-auto bg-white [overflow-anchor:auto]'
     >
       <div className='px-6 pb-4'>
         {/* 이전 메시지 로딩 인디케이터 */}
