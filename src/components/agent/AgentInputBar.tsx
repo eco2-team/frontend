@@ -14,7 +14,7 @@ import SendActiveIcon from '@/assets/icons/icon_send_active.svg';
 import SendInactiveIcon from '@/assets/icons/icon_send_inactive.svg';
 
 interface AgentInputBarProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, imageUrl?: string) => void;
   isStreaming: boolean;
   isLoading: boolean;
   onStop: () => void;
@@ -24,6 +24,7 @@ interface AgentInputBarProps {
   isUploading: boolean;
   onSelectImage: (file: File | null) => void;
   onClearImage: () => void;
+  uploadImage: () => Promise<string | null>;
   // 모델 선택
   selectedModel: ModelOption;
   onSelectModel: (model: ModelOption) => void;
@@ -39,6 +40,7 @@ export const AgentInputBar = ({
   isUploading,
   onSelectImage,
   onClearImage,
+  uploadImage,
   selectedModel,
   onSelectModel,
 }: AgentInputBarProps) => {
@@ -58,9 +60,18 @@ export const AgentInputBar = ({
   // 스트리밍 또는 로딩 중인지
   const isBusy = isStreaming || isLoading;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if ((!text.trim() && !selectedImage) || isUploading) return;
-    onSend(text.trim());
+
+    // 이미지가 있으면 먼저 업로드
+    let imageUrl: string | undefined;
+    if (selectedImage) {
+      const cdnUrl = await uploadImage();
+      imageUrl = cdnUrl ?? undefined;
+      onClearImage();
+    }
+
+    onSend(text.trim(), imageUrl);
     setText('');
   };
 

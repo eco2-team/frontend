@@ -57,7 +57,7 @@ interface UseAgentChatReturn {
   setSelectedModel: (model: ModelOption) => void;
 
   // 메시지 액션
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, imageUrl?: string) => Promise<void>;
   regenerateMessage: (messageId: string) => Promise<void>;
   stopGeneration: () => void;
   loadMoreMessages: () => Promise<void>;
@@ -68,6 +68,7 @@ interface UseAgentChatReturn {
   isUploading: boolean;
   selectImage: (file: File | null) => void;
   clearImage: () => void;
+  uploadImage: () => Promise<string | null>;
 
   // 위치
   userLocation: ReturnType<typeof useAgentLocation>['userLocation'];
@@ -151,10 +152,11 @@ export const useAgentChat = (
 
         // 1. User 메시지를 committed로 업데이트 (서버 ID 매핑)
         if (pendingUserMessageIdRef.current) {
+          const userServerId = result.persistence?.user_message;
           updated = updateMessageInList(
             updated,
             pendingUserMessageIdRef.current,
-            (msg) => updateMessageStatus(msg, 'committed'),
+            (msg) => updateMessageStatus(msg, 'committed', userServerId),
           );
 
           // IndexedDB 동기화
@@ -278,8 +280,14 @@ export const useAgentChat = (
         }
 
         // 이미지 업로드 (직접 전달된 imageUrl이 없을 때만)
+        console.log('[DEBUG] Image upload check:', {
+          hasImageUrl: !!finalImageUrl,
+          hasSelectedImage: !!selectedImage,
+        });
         if (!finalImageUrl && selectedImage) {
+          console.log('[DEBUG] Uploading image...');
           finalImageUrl = (await uploadImage()) ?? undefined;
+          console.log('[DEBUG] Image uploaded:', finalImageUrl);
           clearImage();
         }
 
@@ -302,6 +310,7 @@ export const useAgentChat = (
           chatId,
           message,
           client_id: userMessage.client_id,
+          image_url: finalImageUrl,  // 이미지 URL 디버깅용
           user_location: currentLocation,
           model: selectedModel.id,
         });
@@ -351,9 +360,10 @@ export const useAgentChat = (
   );
 
   // 메시지 전송 (외부 API)
+  // imageUrl: AgentInputBar에서 업로드 후 직접 전달된 CDN URL
   const sendMessage = useCallback(
-    async (message: string) => {
-      await sendMessageInternal(message);
+    async (message: string, imageUrl?: string) => {
+      await sendMessageInternal(message, imageUrl);
     },
     [sendMessageInternal],
   );
@@ -527,6 +537,7 @@ export const useAgentChat = (
     isUploading,
     selectImage,
     clearImage,
+    uploadImage,
 
     // 위치
     userLocation,
