@@ -105,8 +105,24 @@ export const reconcileMessages = (
 ): AgentMessage[] => {
   const { committedRetentionMs = 30000 } = options;
 
-  // 서버 메시지 변환
-  const serverConverted = serverMessages.map(serverToClientMessage);
+  // 로컬 image_url 보존 맵 (서버가 image_url을 반환하지 않을 때 대비)
+  const localImageMap = new Map<string, string>();
+  localMessages.forEach((m) => {
+    if (m.image_url) {
+      if (m.server_id) localImageMap.set(m.server_id, m.image_url);
+      localImageMap.set(m.client_id, m.image_url);
+    }
+  });
+
+  // 서버 메시지 변환 (image_url 없으면 로컬에서 복원)
+  const serverConverted = serverMessages.map((sm) => {
+    const converted = serverToClientMessage(sm);
+    if (!converted.image_url) {
+      const localImage = localImageMap.get(sm.id);
+      if (localImage) converted.image_url = localImage;
+    }
+    return converted;
+  });
 
   // 서버 메시지 ID Map (중복 체크용)
   const serverIdMap = new Map(serverMessages.map((m) => [m.id, m]));
@@ -156,13 +172,7 @@ export const reconcileMessages = (
       return true;
     }
 
-    // server_id 있는 committed: 서버에서 확인된 메시지 → 유지
-    // (다른 페이지에서 로드된 메시지일 수 있으므로 드롭하면 안 됨)
-    if (local.status === 'committed' && local.server_id) {
-      return true;
-    }
-
-    // committed without server_id: retention 기간 내 유지 (Eventual Consistency 버퍼)
+    // committed는 retention 기간 내면 유지 (Eventual Consistency 버퍼)
     if (local.status === 'committed' && !local.server_id) {
       const age = now - new Date(local.created_at).getTime();
       return age < committedRetentionMs;
