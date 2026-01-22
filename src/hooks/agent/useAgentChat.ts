@@ -278,8 +278,14 @@ export const useAgentChat = (
         }
 
         // 이미지 업로드 (직접 전달된 imageUrl이 없을 때만)
+        console.log('[DEBUG] Image upload check:', {
+          hasImageUrl: !!finalImageUrl,
+          hasSelectedImage: !!selectedImage,
+        });
         if (!finalImageUrl && selectedImage) {
+          console.log('[DEBUG] Uploading image...');
           finalImageUrl = (await uploadImage()) ?? undefined;
+          console.log('[DEBUG] Image uploaded:', finalImageUrl);
           clearImage();
         }
 
@@ -302,6 +308,7 @@ export const useAgentChat = (
           chatId,
           message,
           client_id: userMessage.client_id,
+          image_url: finalImageUrl,  // 이미지 URL 디버깅용
           user_location: currentLocation,
           model: selectedModel.id,
         });
