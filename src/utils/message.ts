@@ -111,6 +111,20 @@ export const reconcileMessages = (
   // 서버 메시지 ID Map (중복 체크용)
   const serverIdMap = new Map(serverMessages.map((m) => [m.id, m]));
 
+  // 서버 메시지 content 기반 매칭 (role + content → timestamp)
+  // SSE 실패 후 복귀 시 local pending/failed 메시지와 서버 메시지 중복 방지
+  const CONTENT_MATCH_WINDOW_MS = 120000; // 2분 이내 같은 내용이면 동일 메시지로 판단
+  const serverContentIndex = new Map<string, number>();
+  serverMessages.forEach((m) => {
+    const key = `${m.role}:${m.content}`;
+    const ts = new Date(m.created_at).getTime();
+    // 같은 content가 여러 개면 가장 최신 timestamp 사용
+    const existing = serverContentIndex.get(key);
+    if (!existing || ts > existing) {
+      serverContentIndex.set(key, ts);
+    }
+  });
+
   // 현재 시간
   const now = new Date().getTime();
 
@@ -124,7 +138,20 @@ export const reconcileMessages = (
       return false;
     }
 
-    // pending/streaming은 항상 유지
+    // server_id 없는 로컬 메시지: content 기반 매칭으로 중복 확인
+    if (!local.server_id) {
+      const contentKey = `${local.role}:${local.content}`;
+      const serverTs = serverContentIndex.get(contentKey);
+      if (serverTs !== undefined) {
+        const localTs = new Date(local.created_at).getTime();
+        if (Math.abs(localTs - serverTs) < CONTENT_MATCH_WINDOW_MS) {
+          // 서버에 동일 메시지 존재 → 로컬 드롭 (서버 버전 사용)
+          return false;
+        }
+      }
+    }
+
+    // pending/streaming은 유지 (위 content 매칭에서 걸리지 않은 경우)
     if (local.status === 'pending' || local.status === 'streaming') {
       return true;
     }
@@ -135,7 +162,7 @@ export const reconcileMessages = (
       return age < committedRetentionMs;
     }
 
-    // failed는 유지 (사용자가 재시도 가능)
+    // failed는 유지 (사용자가 재시도 가능) - 위 content 매칭에서 안 걸린 경우만
     if (local.status === 'failed') {
       return true;
     }
