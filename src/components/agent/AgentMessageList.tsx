@@ -3,7 +3,7 @@
  * - Chat UI 스타일 적용 (이코 캐릭터, 라이트 테마)
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useDeferredValue } from 'react';
 import { ChevronDown } from 'lucide-react';
 import EcoImg from '@/assets/images/mainCharacter/main_1.png';
 import type {
@@ -46,53 +46,50 @@ export const AgentMessageList = ({
   const { containerRef, showScrollButton, scrollToBottom, isAtBottom } =
     useScrollToBottom();
 
+  // 스트리밍 텍스트 렌더 배칭 (토큰이 빠르게 들어와도 React가 한 프레임에 모아서 렌더)
+  const deferredStreamingText = useDeferredValue(streamingText);
+
   // 이전 스트리밍 상태 추적
   const wasStreamingRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
 
   // 위로 스크롤 시 이전 메시지 로드
   const handleScroll = () => {
     if (!containerRef.current || !hasMoreHistory || isLoadingHistory) return;
 
     const { scrollTop } = containerRef.current;
-    // 상단에 가까워지면 (100px 이내) 이전 메시지 로드
     if (scrollTop < 100) {
       onLoadMore?.();
     }
   };
 
-  // 새 메시지 시 자동 스크롤 (하단에 있을 때만)
+  // 새 메시지 추가 시 자동 스크롤 (스트리밍 중이 아닐 때만)
   useEffect(() => {
-    if (isAtBottom) {
+    if (!isStreaming && isAtBottom) {
       scrollToBottom('auto');
     }
-  }, [messages, isAtBottom, scrollToBottom]);
+  }, [messages, isStreaming, isAtBottom, scrollToBottom]);
 
-  // 스트리밍 시작 시 강제 스크롤 (... 나올 때)
+  // 스트리밍 스크롤: 시작 시 + 토큰 수신 시 통합 처리
   useEffect(() => {
-    // false → true 변경 시에만 스크롤
+    // 스트리밍 시작 시 강제 스크롤
     if (isStreaming && !wasStreamingRef.current) {
-      // 강제로 하단 스크롤 (스킵 로직 무시)
       if (containerRef.current) {
         containerRef.current.scrollTo({
           top: containerRef.current.scrollHeight,
-          behavior: 'smooth',
+          behavior: 'instant',
         });
       }
     }
     wasStreamingRef.current = isStreaming;
-  }, [isStreaming]);
 
-  // 스트리밍 중 자동 스크롤 (requestAnimationFrame으로 부드럽게)
-  const rafRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (isStreaming && streamingText && isAtBottom) {
-      // 이전 예약된 프레임 취소
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
-      // 다음 프레임에 즉시 스크롤 (instant로 튕김 방지)
+    // 스트리밍 중 토큰 수신 시 하단 유지 (단일 RAF)
+    if (isStreaming && deferredStreamingText && isAtBottom) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
-        scrollToBottom('instant', true);
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight;
+        }
         rafRef.current = null;
       });
     }
@@ -103,13 +100,13 @@ export const AgentMessageList = ({
         rafRef.current = null;
       }
     };
-  }, [isStreaming, streamingText, isAtBottom, scrollToBottom]);
+  }, [isStreaming, deferredStreamingText, isAtBottom]);
 
   return (
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className='no-scrollbar relative flex-1 overflow-y-auto bg-white [overflow-anchor:auto]'
+      className='no-scrollbar relative flex-1 overflow-y-auto bg-white'
     >
       <div className='px-6 pb-4'>
         {/* 이전 메시지 로딩 인디케이터 */}
@@ -157,7 +154,7 @@ export const AgentMessageList = ({
         })}
 
         {/* Stage Indicator (스트리밍 중, 토큰 스트리밍 전) */}
-        {isStreaming && currentStage && !streamingText && (
+        {isStreaming && currentStage && !deferredStreamingText && (
           <div className='flex w-full flex-row justify-start gap-[7px] pt-[15px]'>
             <img src={EcoImg} alt='이코' className='h-9 w-9' />
             <div className='flex w-full flex-col items-start gap-2'>
@@ -169,12 +166,12 @@ export const AgentMessageList = ({
         )}
 
         {/* 스트리밍 메시지 */}
-        {isStreaming && streamingText && (
+        {isStreaming && deferredStreamingText && (
           <div className='flex w-full flex-row justify-start gap-[7px] pt-[15px]'>
             <img src={EcoImg} alt='이코' className='h-9 w-9' />
             <div className='flex w-full flex-col items-start gap-2'>
               <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)] break-words'>
-                <AgentMarkdownRenderer content={streamingText} isStreaming />
+                <AgentMarkdownRenderer content={deferredStreamingText} isStreaming />
                 <span className='bg-brand-primary ml-1 inline-block h-4 w-0.5 animate-pulse' />
               </div>
             </div>
@@ -182,7 +179,7 @@ export const AgentMessageList = ({
         )}
 
         {/* 로딩 인디케이터 (스트리밍 시작 전, Stage 없을 때만) */}
-        {isStreaming && !streamingText && !currentStage && (
+        {isStreaming && !deferredStreamingText && !currentStage && (
           <div className='flex w-full flex-row justify-start gap-[7px] pt-[15px]'>
             <img src={EcoImg} alt='이코' className='h-9 w-9' />
             <div className='flex w-full flex-col items-start gap-2'>

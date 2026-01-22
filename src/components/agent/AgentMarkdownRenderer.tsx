@@ -4,6 +4,7 @@
  * - 라이트 테마 적용
  */
 
+import { useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import type { ComponentType, JSX } from 'react';
 import { AgentCodeBlock } from './AgentCodeBlock';
@@ -14,6 +15,8 @@ interface AgentMarkdownRendererProps {
   isStreaming?: boolean;
 }
 
+const LINK_SAFETY_OFF = { enabled: false } as const;
+
 type Components = {
   [Key in keyof JSX.IntrinsicElements]?: ComponentType<JSX.IntrinsicElements[Key]> | keyof JSX.IntrinsicElements;
 };
@@ -22,7 +25,8 @@ export const AgentMarkdownRenderer = ({
   content,
   isStreaming = false,
 }: AgentMarkdownRendererProps) => {
-  const components: Components = {
+  // components 객체를 메모이제이션하여 Streamdown 불필요 재렌더링 방지
+  const components: Components = useMemo(() => ({
     // 코드 블록
     code({ className, children, ...props }) {
       const match = /language-(\w+)/.exec(className || '');
@@ -154,7 +158,7 @@ export const AgentMarkdownRenderer = ({
     hr() {
       return <hr className='border-stroke-default my-4' />;
     },
-  };
+  }), []);
 
   return (
     <div className='max-w-none'>
@@ -162,7 +166,7 @@ export const AgentMarkdownRenderer = ({
         components={components}
         isAnimating={isStreaming}
         controls={false}
-        linkSafety={{ enabled: false }}
+        linkSafety={LINK_SAFETY_OFF}
       >
         {content}
       </Streamdown>
