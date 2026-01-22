@@ -17,6 +17,7 @@ import { AgentSidebar } from './sidebar';
 import { AgentMessageList } from './AgentMessageList';
 import { AgentInputBar } from './AgentInputBar';
 import { AgentMessageQueue } from './AgentMessageQueue';
+import { toast } from '@/components/Toast/toast';
 import GoBack from '@/assets/icons/go_back.svg';
 
 export const AgentContainer = () => {
@@ -86,13 +87,30 @@ export const AgentContainer = () => {
   // 대화 삭제 뮤테이션
   const deleteChatMutation = useMutation({
     mutationFn: AgentService.deleteChat,
-    onSuccess: (_, deletedChatId) => {
+    onMutate: () => {
+      // 로딩 토스트 표시 (dismiss 함수 반환)
+      return { dismissLoading: toast.loading('채팅 삭제 중') };
+    },
+    onSuccess: (_, deletedChatId, context) => {
+      // 로딩 토스트 닫기
+      context?.dismissLoading?.();
+
       // 현재 선택된 대화가 삭제된 경우 초기화
       if (currentChat?.id === deletedChatId) {
         clearMessages();
       }
       // 목록 갱신
       queryClient.invalidateQueries({ queryKey: ['agent', 'chats'] });
+
+      // 성공 토스트
+      toast.success('삭제되었습니다');
+    },
+    onError: (_, __, context) => {
+      // 로딩 토스트 닫기
+      context?.dismissLoading?.();
+
+      // 에러 토스트
+      toast.error('삭제에 실패했습니다');
     },
   });
 
