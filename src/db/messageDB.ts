@@ -81,6 +81,13 @@ export class MessageDB {
   }
 
   /**
+   * Helper: synced 값 계산 (타입 안전)
+   */
+  private getSyncedValue(message: AgentMessage): 0 | 1 {
+    return message.status === 'committed' && !!message.server_id ? 1 : 0;
+  }
+
+  /**
    * 메시지 저장 (단일)
    */
   async saveMessage(chatId: string, message: AgentMessage): Promise<void> {
@@ -89,7 +96,7 @@ export class MessageDB {
     const record: MessageRecord = {
       ...message,
       chat_id: chatId,
-      synced: (message.status === 'committed' && !!message.server_id) as any,
+      synced: this.getSyncedValue(message),
       local_timestamp: Date.now(),
     };
 
@@ -111,7 +118,7 @@ export class MessageDB {
       const record: MessageRecord = {
         ...msg,
         chat_id: chatId,
-        synced: (msg.status === 'committed' && !!msg.server_id) as any,
+        synced: this.getSyncedValue(msg),
         local_timestamp: Date.now(),
       };
       await tx.store.put(record);
@@ -176,7 +183,7 @@ export class MessageDB {
     if (serverId) {
       record.server_id = serverId;
       record.id = serverId;
-      record.synced = true as any;
+      record.synced = 1;
     }
     record.local_timestamp = Date.now();
 

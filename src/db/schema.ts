@@ -12,8 +12,11 @@ import type { AgentMessage } from '@/api/services/agent';
 export interface MessageRecord extends AgentMessage {
   /** 채팅 ID (FK) */
   chat_id: string;
-  /** 서버 동기화 완료 여부 */
-  synced: boolean;
+  /**
+   * 서버 동기화 완료 여부
+   * IndexedDB는 boolean을 0/1로 저장하므로 number 타입 사용
+   */
+  synced: 0 | 1;
   /** 로컬 저장 시간 (cleanup용) */
   local_timestamp: number;
 }
