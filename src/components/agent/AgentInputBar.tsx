@@ -95,12 +95,20 @@ export const AgentInputBar = ({
 
   // 갤러리 버튼 클릭 핸들러 (키보드 먼저 닫기)
   const handleGalleryClick = () => {
-    // iOS: 키보드가 열린 상태에서 파일 선택 시 viewport 이슈 방지
-    textareaRef.current?.blur();
-    // 약간의 딜레이 후 파일 선택 열기 (키보드 닫힘 대기)
-    setTimeout(() => {
+    const isKeyboardVisible =
+      window.visualViewport &&
+      window.visualViewport.height < window.innerHeight * 0.8;
+
+    if (isKeyboardVisible) {
+      // iOS: 키보드가 열린 상태 → 먼저 닫고 애니메이션 완료 후 파일 선택
+      textareaRef.current?.blur();
+      setTimeout(() => {
+        galleryInputRef.current?.click();
+      }, 350); // iOS 키보드 애니메이션 ~300ms
+    } else {
+      // 키보드가 없으면 바로 파일 선택
       galleryInputRef.current?.click();
-    }, 100);
+    }
   };
 
   const handleModelSelect = (model: ModelOption) => {
