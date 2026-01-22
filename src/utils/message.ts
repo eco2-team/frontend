@@ -156,13 +156,7 @@ export const reconcileMessages = (
       return true;
     }
 
-    // server_id 있는 committed: 서버에서 확인된 메시지 → 유지
-    // (다른 페이지에서 로드된 메시지일 수 있으므로 드롭하면 안 됨)
-    if (local.status === 'committed' && local.server_id) {
-      return true;
-    }
-
-    // committed without server_id: retention 기간 내 유지 (Eventual Consistency 버퍼)
+    // committed는 retention 기간 내면 유지 (Eventual Consistency 버퍼)
     if (local.status === 'committed' && !local.server_id) {
       const age = now - new Date(local.created_at).getTime();
       return age < committedRetentionMs;
