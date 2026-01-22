@@ -57,7 +57,7 @@ interface UseAgentChatReturn {
   setSelectedModel: (model: ModelOption) => void;
 
   // 메시지 액션
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, imageUrl?: string) => Promise<void>;
   regenerateMessage: (messageId: string) => Promise<void>;
   stopGeneration: () => void;
   loadMoreMessages: () => Promise<void>;
@@ -68,6 +68,7 @@ interface UseAgentChatReturn {
   isUploading: boolean;
   selectImage: (file: File | null) => void;
   clearImage: () => void;
+  uploadImage: () => Promise<string | null>;
 
   // 위치
   userLocation: ReturnType<typeof useAgentLocation>['userLocation'];
@@ -358,9 +359,10 @@ export const useAgentChat = (
   );
 
   // 메시지 전송 (외부 API)
+  // imageUrl: AgentInputBar에서 업로드 후 직접 전달된 CDN URL
   const sendMessage = useCallback(
-    async (message: string) => {
-      await sendMessageInternal(message);
+    async (message: string, imageUrl?: string) => {
+      await sendMessageInternal(message, imageUrl);
     },
     [sendMessageInternal],
   );
@@ -534,6 +536,7 @@ export const useAgentChat = (
     isUploading,
     selectImage,
     clearImage,
+    uploadImage,
 
     // 위치
     userLocation,

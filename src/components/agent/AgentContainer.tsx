@@ -52,6 +52,7 @@ export const AgentContainer = () => {
     isUploading,
     selectImage,
     clearImage,
+    uploadImage,
     createNewChat,
     loadChatMessages,
     clearMessages,
@@ -101,28 +102,26 @@ export const AgentContainer = () => {
     if (wasStreamingRef.current && !isStreaming && !isLoading) {
       const nextMessage = dequeue();
       if (nextMessage) {
-        // TODO: 이미지 URL이 있을 경우 sendMessage에 전달하는 방법 필요
-        // 현재는 텍스트만 전송
-        sendMessage(nextMessage.content);
+        // 이미지 URL 포함 전송
+        sendMessage(nextMessage.content, nextMessage.imageUrl);
       }
     }
     wasStreamingRef.current = isStreaming;
   }, [isStreaming, isLoading, dequeue, sendMessage]);
 
   // 메시지 전송 핸들러 (스트리밍 중이면 큐에 추가)
+  // imageUrl은 AgentInputBar에서 업로드 후 직접 전달됨
   const handleSend = useCallback(
-    (message: string) => {
+    (message: string, imageUrl?: string) => {
       if (isStreaming || isLoading) {
         // 스트리밍 중이면 큐에 추가
-        const imageUrl = previewUrl ?? undefined;
         enqueue(message, imageUrl);
-        clearImage(); // 이미지 선택 해제
       } else {
-        // 바로 전송
-        sendMessage(message);
+        // 바로 전송 (이미지 URL 직접 전달)
+        sendMessage(message, imageUrl);
       }
     },
-    [isStreaming, isLoading, previewUrl, enqueue, clearImage, sendMessage],
+    [isStreaming, isLoading, enqueue, sendMessage],
   );
 
   // 큐에서 특정 메시지 즉시 전송
@@ -133,8 +132,8 @@ export const AgentContainer = () => {
 
       // 현재 스트리밍 중이 아니면 바로 전송
       if (!isStreaming && !isLoading) {
-        // TODO: 이미지 URL 전달 방법 필요
-        sendMessage(queuedMessage.content);
+        // 이미지 URL 직접 전달
+        sendMessage(queuedMessage.content, queuedMessage.imageUrl);
       } else {
         // 스트리밍 중이면 큐 맨 앞에 추가 (다음 전송 대상으로)
         enqueue(queuedMessage.content, queuedMessage.imageUrl);
@@ -240,6 +239,7 @@ export const AgentContainer = () => {
           isUploading={isUploading}
           onSelectImage={selectImage}
           onClearImage={clearImage}
+          uploadImage={uploadImage}
           selectedModel={selectedModel}
           onSelectModel={setSelectedModel}
         />
