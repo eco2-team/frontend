@@ -93,6 +93,16 @@ export const AgentInputBar = ({
 
   const canSend = (text.trim() || selectedImage) && !isUploading;
 
+  // 갤러리 버튼 클릭 핸들러 (키보드 먼저 닫기)
+  const handleGalleryClick = () => {
+    // iOS: 키보드가 열린 상태에서 파일 선택 시 viewport 이슈 방지
+    textareaRef.current?.blur();
+    // 약간의 딜레이 후 파일 선택 열기 (키보드 닫힘 대기)
+    setTimeout(() => {
+      galleryInputRef.current?.click();
+    }, 100);
+  };
+
   const handleModelSelect = (model: ModelOption) => {
     onSelectModel(model);
     setModelDropdownOpen(false);
@@ -180,7 +190,7 @@ export const AgentInputBar = ({
 
           {/* 갤러리 버튼 */}
           <button
-            onClick={() => galleryInputRef.current?.click()}
+            onClick={handleGalleryClick}
             className='flex h-10 w-10 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100'
             title='갤러리'
           >
