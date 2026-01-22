@@ -8,11 +8,7 @@
 import { openDB } from 'idb';
 import type { IDBPDatabase } from 'idb';
 import type { AgentMessage, MessageStatus } from '@/api/services/agent';
-import type {
-  AgentDBSchema,
-  MessageRecord,
-  SyncMetadata,
-} from './schema';
+import type { AgentDBSchema, MessageRecord, SyncMetadata } from './schema';
 import {
   DB_NAME,
   DB_VERSION,
@@ -32,22 +28,30 @@ export class MessageDB {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      const self = this;
-
       this.db = await openDB<AgentDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion) {
-          console.log(`[MessageDB] Upgrading from ${oldVersion} to ${DB_VERSION}`);
+        upgrade(db, oldVersion, _newVersion, transaction) {
+          console.log(
+            `[MessageDB] Upgrading from ${oldVersion} to ${DB_VERSION}`,
+          );
 
-          // v1: 초기 스키마
+          // v1: 초기 스키마 (레거시, v3에서 마이그레이션됨)
           if (oldVersion < 1) {
             // 메시지 저장소
             const msgStore = db.createObjectStore('messages', {
               keyPath: 'client_id',
             });
-            msgStore.createIndex('by-chat', 'chat_id', { unique: false });
-            msgStore.createIndex('by-chat-created', ['chat_id', 'created_at'], {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex('by-chat', 'chat_id', {
               unique: false,
             });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex(
+              'by-chat-created',
+              ['chat_id', 'created_at'],
+              {
+                unique: false,
+              },
+            );
             msgStore.createIndex('by-status', 'status', { unique: false });
             msgStore.createIndex('by-synced', 'synced', { unique: false });
             msgStore.createIndex('by-local-timestamp', 'local_timestamp', {
@@ -57,20 +61,85 @@ export class MessageDB {
             // 동기화 메타데이터
             db.createObjectStore('sync_metadata', { keyPath: 'chat_id' });
 
-            console.log('[MessageDB] Schema created');
+            console.log('[MessageDB] Schema v1 created');
+          }
+
+          // v2: user_id 격리 추가 (레거시, v3에서 마이그레이션됨)
+          if (oldVersion < 2) {
+            const msgStore = transaction.objectStore('messages');
+
+            // 사용자별 격리를 위한 인덱스
+            msgStore.createIndex('by-user', 'user_id', { unique: false });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex(
+              'by-user-chat',
+              ['user_id', 'chat_id'],
+              {
+                unique: false,
+              },
+            );
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex(
+              'by-user-chat-created',
+              ['user_id', 'chat_id', 'created_at'],
+              { unique: false },
+            );
+
+            console.log(
+              '[MessageDB] Schema upgraded to v2 (user_id isolation)',
+            );
+          }
+
+          // v3: 명확한 계층화 (chat_id → session_id)
+          if (oldVersion < 3) {
+            const msgStore = transaction.objectStore('messages');
+
+            // 기존 레거시 인덱스 삭제
+            if (oldVersion >= 2) {
+              try {
+                msgStore.deleteIndex('by-user-chat');
+                msgStore.deleteIndex('by-user-chat-created');
+              } catch (e) {
+                console.warn('[MessageDB] Failed to delete old indexes:', e);
+              }
+            }
+
+            // 새로운 session_id 기반 인덱스 생성
+            msgStore.createIndex('by-user-session', ['user_id', 'session_id'], {
+              unique: false,
+            });
+            msgStore.createIndex(
+              'by-user-session-created',
+              ['user_id', 'session_id', 'created_at'],
+              { unique: false },
+            );
+
+            // 레거시 호환 인덱스 (by-chat → by-session으로 이름만 변경)
+            msgStore.createIndex('by-session', 'session_id', { unique: false });
+            msgStore.createIndex(
+              'by-session-created',
+              ['session_id', 'created_at'],
+              {
+                unique: false,
+              },
+            );
+
+            console.log(
+              '[MessageDB] Schema upgraded to v3 (session_id hierarchy)',
+            );
           }
         },
-        blocked() {
+        blocked: () => {
           console.warn('[MessageDB] Upgrade blocked - close other tabs');
         },
-        blocking() {
+        blocking: () => {
           console.warn('[MessageDB] Blocking other tabs');
-          self.db?.close();
-          self.db = null;
+          this.db?.close();
+          this.db = null;
         },
-        terminated() {
+        terminated: () => {
           console.error('[MessageDB] DB terminated unexpectedly');
-          self.db = null;
+          this.db = null;
         },
       });
 
@@ -81,15 +150,29 @@ export class MessageDB {
   }
 
   /**
-   * 메시지 저장 (단일)
+   * Helper: synced 값 계산 (타입 안전)
    */
-  async saveMessage(chatId: string, message: AgentMessage): Promise<void> {
+  private getSyncedValue(message: AgentMessage): 0 | 1 {
+    return message.status === 'committed' && !!message.server_id ? 1 : 0;
+  }
+
+  /**
+   * 메시지 저장 (단일)
+   * @param userId - Backend: users_accounts.id
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
+   */
+  async saveMessage(
+    userId: string,
+    sessionId: string,
+    message: AgentMessage,
+  ): Promise<void> {
     await this.init();
 
     const record: MessageRecord = {
       ...message,
-      chat_id: chatId,
-      synced: (message.status === 'committed' && !!message.server_id) as any,
+      user_id: userId,
+      session_id: sessionId,
+      synced: this.getSyncedValue(message),
       local_timestamp: Date.now(),
     };
 
@@ -100,8 +183,14 @@ export class MessageDB {
 
   /**
    * 메시지 저장 (일괄)
+   * @param userId - Backend: users_accounts.id
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async saveMessages(chatId: string, messages: AgentMessage[]): Promise<void> {
+  async saveMessages(
+    userId: string,
+    sessionId: string,
+    messages: AgentMessage[],
+  ): Promise<void> {
     if (messages.length === 0) return;
 
     await this.init();
@@ -110,28 +199,36 @@ export class MessageDB {
     for (const msg of messages) {
       const record: MessageRecord = {
         ...msg,
-        chat_id: chatId,
-        synced: (msg.status === 'committed' && !!msg.server_id) as any,
+        user_id: userId,
+        session_id: sessionId,
+        synced: this.getSyncedValue(msg),
         local_timestamp: Date.now(),
       };
       await tx.store.put(record);
     }
 
     await tx.done;
-    console.log(`[MessageDB] Saved ${messages.length} messages to ${chatId}`);
+    console.log(
+      `[MessageDB] Saved ${messages.length} messages to user:${userId}/session:${sessionId}`,
+    );
   }
 
   /**
-   * 채팅별 메시지 조회 (시간순 정렬)
+   * 세션별 메시지 조회 (시간순 정렬, user_id 격리)
+   * @param userId - Backend: users_accounts.id
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async getMessages(chatId: string): Promise<AgentMessage[]> {
+  async getMessages(
+    userId: string,
+    sessionId: string,
+  ): Promise<AgentMessage[]> {
     await this.init();
 
-    // 복합 인덱스로 정렬된 결과 가져오기
+    // 복합 인덱스로 정렬된 결과 가져오기 (user_id + session_id + created_at)
     const messages = await this.db!.getAllFromIndex(
       'messages',
-      'by-chat-created',
-      IDBKeyRange.bound([chatId, ''], [chatId, '\uffff']),
+      'by-user-session-created',
+      IDBKeyRange.bound([userId, sessionId, ''], [userId, sessionId, '\uffff']),
     );
 
     return messages.map(this.recordToMessage);
@@ -147,14 +244,25 @@ export class MessageDB {
   }
 
   /**
-   * 동기화되지 않은 메시지 조회
+   * 동기화되지 않은 메시지 조회 (user_id + session_id 격리)
+   * @param userId - Backend: users_accounts.id
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async getUnsyncedMessages(chatId: string): Promise<AgentMessage[]> {
+  async getUnsyncedMessages(
+    userId: string,
+    sessionId: string,
+  ): Promise<AgentMessage[]> {
     await this.init();
     // boolean을 number로 변환 (false = 0)
-    const allUnsynced = await this.db!.getAllFromIndex('messages', 'by-synced', 0);
-    const chatUnsynced = allUnsynced.filter((r) => r.chat_id === chatId);
-    return chatUnsynced.map(this.recordToMessage);
+    const allUnsynced = await this.db!.getAllFromIndex(
+      'messages',
+      'by-synced',
+      0,
+    );
+    const sessionUnsynced = allUnsynced.filter(
+      (r) => r.user_id === userId && r.session_id === sessionId,
+    );
+    return sessionUnsynced.map(this.recordToMessage);
   }
 
   /**
@@ -176,7 +284,7 @@ export class MessageDB {
     if (serverId) {
       record.server_id = serverId;
       record.id = serverId;
-      record.synced = true as any;
+      record.synced = 1;
     }
     record.local_timestamp = Date.now();
 
@@ -199,19 +307,23 @@ export class MessageDB {
 
   /**
    * 동기화 메타데이터 조회
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async getSyncMetadata(chatId: string): Promise<SyncMetadata | null> {
+  async getSyncMetadata(sessionId: string): Promise<SyncMetadata | null> {
     await this.init();
-    return (await this.db!.get('sync_metadata', chatId)) || null;
+    return (await this.db!.get('sync_metadata', sessionId)) || null;
   }
 
   /**
-   * 오래된 메시지 정리
+   * 오래된 메시지 정리 (user_id + session_id 격리)
    * - synced=true && server_id 있음 && retention 시간 초과 → 삭제
    * - local_timestamp 기준 TTL 초과 → 삭제
+   * @param userId - Backend: users_accounts.id
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
   async cleanup(
-    chatId: string,
+    userId: string,
+    sessionId: string,
     options: {
       committedRetentionMs?: number;
       ttlMs?: number;
@@ -224,11 +336,15 @@ export class MessageDB {
 
     await this.init();
     const now = Date.now();
-    const messages = await this.db!.getAllFromIndex('messages', 'by-chat', chatId);
+    const allMessages = await this.db!.getAllFromIndex(
+      'messages',
+      'by-user-session',
+      [userId, sessionId],
+    );
 
     const toDelete: string[] = [];
 
-    for (const record of messages) {
+    for (const record of allMessages) {
       const age = now - record.local_timestamp;
 
       // TTL 초과 (7일)
@@ -255,7 +371,9 @@ export class MessageDB {
       }
       await tx.done;
 
-      console.log(`[MessageDB] Cleaned up ${toDelete.length} messages from ${chatId}`);
+      console.log(
+        `[MessageDB] Cleaned up ${toDelete.length} messages from user:${userId}/session:${sessionId}`,
+      );
     }
 
     return toDelete.length;
@@ -263,10 +381,15 @@ export class MessageDB {
 
   /**
    * 채팅 전체 삭제 (채팅방 나가기 시)
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async deleteChat(chatId: string): Promise<void> {
+  async deleteChat(sessionId: string): Promise<void> {
     await this.init();
-    const messages = await this.db!.getAllFromIndex('messages', 'by-chat', chatId);
+    const messages = await this.db!.getAllFromIndex(
+      'messages',
+      'by-session',
+      sessionId,
+    );
 
     const tx = this.db!.transaction(['messages', 'sync_metadata'], 'readwrite');
 
@@ -276,10 +399,12 @@ export class MessageDB {
     }
 
     // 메타데이터 삭제
-    await tx.objectStore('sync_metadata').delete(chatId);
+    await tx.objectStore('sync_metadata').delete(sessionId);
     await tx.done;
 
-    console.log(`[MessageDB] Deleted chat ${chatId} (${messages.length} messages)`);
+    console.log(
+      `[MessageDB] Deleted session ${sessionId} (${messages.length} messages)`,
+    );
   }
 
   /**
@@ -340,7 +465,7 @@ export class MessageDB {
    */
   private recordToMessage(record: MessageRecord): AgentMessage {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { chat_id, synced, local_timestamp, ...message } = record;
+    const { user_id, session_id, synced, local_timestamp, ...message } = record;
     return message;
   }
 }
