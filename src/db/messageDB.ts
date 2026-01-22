@@ -8,11 +8,7 @@
 import { openDB } from 'idb';
 import type { IDBPDatabase } from 'idb';
 import type { AgentMessage, MessageStatus } from '@/api/services/agent';
-import type {
-  AgentDBSchema,
-  MessageRecord,
-  SyncMetadata,
-} from './schema';
+import type { AgentDBSchema, MessageRecord, SyncMetadata } from './schema';
 import {
   DB_NAME,
   DB_VERSION,
@@ -32,11 +28,11 @@ export class MessageDB {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
-      const self = this;
-
       this.db = await openDB<AgentDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, _newVersion, transaction) {
-          console.log(`[MessageDB] Upgrading from ${oldVersion} to ${DB_VERSION}`);
+          console.log(
+            `[MessageDB] Upgrading from ${oldVersion} to ${DB_VERSION}`,
+          );
 
           // v1: 초기 스키마 (레거시, v3에서 마이그레이션됨)
           if (oldVersion < 1) {
@@ -45,11 +41,17 @@ export class MessageDB {
               keyPath: 'client_id',
             });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (msgStore as any).createIndex('by-chat', 'chat_id', { unique: false });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (msgStore as any).createIndex('by-chat-created', ['chat_id', 'created_at'], {
+            (msgStore as any).createIndex('by-chat', 'chat_id', {
               unique: false,
             });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex(
+              'by-chat-created',
+              ['chat_id', 'created_at'],
+              {
+                unique: false,
+              },
+            );
             msgStore.createIndex('by-status', 'status', { unique: false });
             msgStore.createIndex('by-synced', 'synced', { unique: false });
             msgStore.createIndex('by-local-timestamp', 'local_timestamp', {
@@ -69,9 +71,13 @@ export class MessageDB {
             // 사용자별 격리를 위한 인덱스
             msgStore.createIndex('by-user', 'user_id', { unique: false });
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (msgStore as any).createIndex('by-user-chat', ['user_id', 'chat_id'], {
-              unique: false,
-            });
+            (msgStore as any).createIndex(
+              'by-user-chat',
+              ['user_id', 'chat_id'],
+              {
+                unique: false,
+              },
+            );
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (msgStore as any).createIndex(
               'by-user-chat-created',
@@ -79,7 +85,9 @@ export class MessageDB {
               { unique: false },
             );
 
-            console.log('[MessageDB] Schema upgraded to v2 (user_id isolation)');
+            console.log(
+              '[MessageDB] Schema upgraded to v2 (user_id isolation)',
+            );
           }
 
           // v3: 명확한 계층화 (chat_id → session_id)
@@ -108,24 +116,30 @@ export class MessageDB {
 
             // 레거시 호환 인덱스 (by-chat → by-session으로 이름만 변경)
             msgStore.createIndex('by-session', 'session_id', { unique: false });
-            msgStore.createIndex('by-session-created', ['session_id', 'created_at'], {
-              unique: false,
-            });
+            msgStore.createIndex(
+              'by-session-created',
+              ['session_id', 'created_at'],
+              {
+                unique: false,
+              },
+            );
 
-            console.log('[MessageDB] Schema upgraded to v3 (session_id hierarchy)');
+            console.log(
+              '[MessageDB] Schema upgraded to v3 (session_id hierarchy)',
+            );
           }
         },
-        blocked() {
+        blocked: () => {
           console.warn('[MessageDB] Upgrade blocked - close other tabs');
         },
-        blocking() {
+        blocking: () => {
           console.warn('[MessageDB] Blocking other tabs');
-          self.db?.close();
-          self.db = null;
+          this.db?.close();
+          this.db = null;
         },
-        terminated() {
+        terminated: () => {
           console.error('[MessageDB] DB terminated unexpectedly');
-          self.db = null;
+          this.db = null;
         },
       });
 
@@ -204,7 +218,10 @@ export class MessageDB {
    * @param userId - Backend: users_accounts.id
    * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async getMessages(userId: string, sessionId: string): Promise<AgentMessage[]> {
+  async getMessages(
+    userId: string,
+    sessionId: string,
+  ): Promise<AgentMessage[]> {
     await this.init();
 
     // 복합 인덱스로 정렬된 결과 가져오기 (user_id + session_id + created_at)
@@ -237,7 +254,11 @@ export class MessageDB {
   ): Promise<AgentMessage[]> {
     await this.init();
     // boolean을 number로 변환 (false = 0)
-    const allUnsynced = await this.db!.getAllFromIndex('messages', 'by-synced', 0);
+    const allUnsynced = await this.db!.getAllFromIndex(
+      'messages',
+      'by-synced',
+      0,
+    );
     const sessionUnsynced = allUnsynced.filter(
       (r) => r.user_id === userId && r.session_id === sessionId,
     );
@@ -315,10 +336,11 @@ export class MessageDB {
 
     await this.init();
     const now = Date.now();
-    const allMessages = await this.db!.getAllFromIndex('messages', 'by-user-session', [
-      userId,
-      sessionId,
-    ]);
+    const allMessages = await this.db!.getAllFromIndex(
+      'messages',
+      'by-user-session',
+      [userId, sessionId],
+    );
 
     const toDelete: string[] = [];
 
@@ -363,7 +385,11 @@ export class MessageDB {
    */
   async deleteChat(sessionId: string): Promise<void> {
     await this.init();
-    const messages = await this.db!.getAllFromIndex('messages', 'by-session', sessionId);
+    const messages = await this.db!.getAllFromIndex(
+      'messages',
+      'by-session',
+      sessionId,
+    );
 
     const tx = this.db!.transaction(['messages', 'sync_metadata'], 'readwrite');
 
@@ -376,7 +402,9 @@ export class MessageDB {
     await tx.objectStore('sync_metadata').delete(sessionId);
     await tx.done;
 
-    console.log(`[MessageDB] Deleted session ${sessionId} (${messages.length} messages)`);
+    console.log(
+      `[MessageDB] Deleted session ${sessionId} (${messages.length} messages)`,
+    );
   }
 
   /**

@@ -41,12 +41,12 @@ export const useMessagePersistence = (
     const prevPendingIds = new Set(
       prevMessagesRef.current
         .filter((m) => m.status === 'pending')
-        .map((m) => m.client_id)
+        .map((m) => m.client_id),
     );
 
     // 새로운 pending 메시지가 있으면 즉시 저장
     const newPending = pendingMessages.filter(
-      (m) => !prevPendingIds.has(m.client_id)
+      (m) => !prevPendingIds.has(m.client_id),
     );
 
     if (newPending.length > 0) {
@@ -106,9 +106,11 @@ export const useMessagePersistence = (
 
     if (currentChatId && currentMessages.length > 0) {
       // IndexedDB는 비동기라 보장 안됨, 하지만 시도는 필요
-      messageDB.saveMessages(currentUserId, currentChatId, currentMessages).catch(() => {
-        // beforeunload에서는 에러 로깅도 의미 없음
-      });
+      messageDB
+        .saveMessages(currentUserId, currentChatId, currentMessages)
+        .catch(() => {
+          // beforeunload에서는 에러 로깅도 의미 없음
+        });
     }
   }, []);
 
