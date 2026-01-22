@@ -1,9 +1,10 @@
 /**
  * Agent SSE 토큰 스트리밍 훅
- * - fetch + ReadableStream 기반 (PWA Service Worker 간섭 우회)
+ * - EventSource 기반 (iOS Safari PWA 호환)
  * - 수동 재연결 with exponential backoff
- * - Safari/iOS 백그라운드 대응 (visibility change)
+ * - Safari 백그라운드 대응 (visibility change, readyState 모니터링)
  * - Last-Event-ID 기반 복구 (token_recovery)
+ * - Stale 감지 콜백 (polling fallback 연동)
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -42,7 +43,7 @@ const getStageMessage = (stage: StageType): string => {
 };
 
 /** Progress 이벤트를 받을 stage 목록 */
-const PROGRESS_STAGES: ReadonlySet<string> = new Set([
+const PROGRESS_STAGES = [
   'queued',
   'intent',
   'vision',
@@ -59,13 +60,15 @@ const PROGRESS_STAGES: ReadonlySet<string> = new Set([
   'aggregator',
   'summarize',
   'answer',
-]);
+] as const;
 
 interface UseAgentSSEOptions {
   onToken?: (token: string) => void;
   onProgress?: (stage: CurrentStage) => void;
   onComplete?: (result: DoneEvent['result']) => void;
   onError?: (error: Error) => void;
+  /** SSE 연결은 되었지만 meaningful 이벤트를 받지 못할 때 콜백 (polling fallback 트리거) */
+  onStale?: (jobId: string) => void;
 }
 
 interface UseAgentSSEReturn {
@@ -77,60 +80,60 @@ interface UseAgentSSEReturn {
   disconnect: () => void;
 }
 
-interface SSEEvent {
-  event: string;
-  data: string;
-  id?: string;
-}
-
 const MAX_RECONNECT_ATTEMPTS = 5;
 const INITIAL_RECONNECT_DELAY = 1000;
 
-// 타임아웃 설정 (LLM 응답 시간 고려)
+// 타임아웃 설정
 const DEFAULT_EVENT_TIMEOUT = 60000; // 60초
-const IMAGE_GENERATION_TIMEOUT = 180000; // 이미지 생성은 3분
+const IMAGE_GENERATION_TIMEOUT = 180000; // 3분
 
 // 연결 상태 확인 주기
 const HEALTH_CHECK_INTERVAL = 10000; // 10초
 
+// Stale 감지: meaningful 이벤트 없이 이 시간이 지나면 onStale 호출
+const STALE_THRESHOLD = 25000; // 25초
+
 export const useAgentSSE = (
   options: UseAgentSSEOptions = {},
 ): UseAgentSSEReturn => {
-  const { onToken, onProgress, onComplete, onError } = options;
+  const { onToken, onProgress, onComplete, onError, onStale } = options;
 
   const [streamingText, setStreamingText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentStage, setCurrentStage] = useState<CurrentStage | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
-  // Refs for managing connection state
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Refs
+  const eventSourceRef = useRef<EventSource | null>(null);
   const currentJobIdRef = useRef<string | null>(null);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const staleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentTimeoutDurationRef = useRef(DEFAULT_EVENT_TIMEOUT);
   const isManualDisconnectRef = useRef(false);
-  const isConnectedRef = useRef(false);
   const accumulatedTextRef = useRef('');
   const lastEventSeqRef = useRef<number | null>(null);
   const lastEventTimeRef = useRef<number>(Date.now());
+  const receivedMeaningfulEventRef = useRef(false);
 
-  // Callback refs to avoid stale closures
+  // Callback refs
   const onTokenRef = useRef(onToken);
   const onProgressRef = useRef(onProgress);
   const onCompleteRef = useRef(onComplete);
   const onErrorRef = useRef(onError);
+  const onStaleRef = useRef(onStale);
 
   useEffect(() => {
     onTokenRef.current = onToken;
     onProgressRef.current = onProgress;
     onCompleteRef.current = onComplete;
     onErrorRef.current = onError;
-  }, [onToken, onProgress, onComplete, onError]);
+    onStaleRef.current = onStale;
+  }, [onToken, onProgress, onComplete, onError, onStale]);
 
-  // Cleanup function
+  // Cleanup
   const cleanup = useCallback(() => {
     console.log('[SSE] Cleanup called');
     if (reconnectTimeoutRef.current) {
@@ -145,11 +148,14 @@ export const useAgentSSE = (
       clearInterval(healthCheckIntervalRef.current);
       healthCheckIntervalRef.current = null;
     }
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+    if (staleTimeoutRef.current) {
+      clearTimeout(staleTimeoutRef.current);
+      staleTimeoutRef.current = null;
     }
-    isConnectedRef.current = false;
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
   }, []);
 
   // 이벤트 타임아웃 리셋
@@ -164,12 +170,8 @@ export const useAgentSSE = (
       lastEventTimeRef.current = Date.now();
 
       eventTimeoutRef.current = setTimeout(() => {
-        if (!isManualDisconnectRef.current && isConnectedRef.current) {
-          console.error(
-            '[SSE] Event timeout - no events received for',
-            timeoutDuration / 1000,
-            'seconds',
-          );
+        if (!isManualDisconnectRef.current && eventSourceRef.current) {
+          console.error('[SSE] Event timeout -', timeoutDuration / 1000, 's');
           const err = new Error('서버 응답 타임아웃');
           setError(err);
           onErrorRef.current?.(err);
@@ -193,157 +195,13 @@ export const useAgentSSE = (
     reconnectAttemptRef.current = 0;
     accumulatedTextRef.current = '';
     lastEventSeqRef.current = null;
+    receivedMeaningfulEventRef.current = false;
   }, [cleanup]);
-
-  // SSE 이벤트 처리
-  const handleSSEEvent = useCallback(
-    (event: SSEEvent) => {
-      const { event: eventType, data } = event;
-
-      if (!data) return;
-
-      // Progress events
-      if (PROGRESS_STAGES.has(eventType)) {
-        try {
-          const parsed: ProgressEvent = JSON.parse(data);
-          console.log('[SSE] Progress:', parsed.stage, parsed.status);
-
-          if (parsed.seq) {
-            lastEventSeqRef.current = parsed.seq;
-          }
-
-          const stage: CurrentStage = {
-            stage: parsed.stage,
-            status: parsed.status,
-            progress: parsed.progress,
-            message: getStageMessage(parsed.stage),
-          };
-          setCurrentStage(stage);
-          onProgressRef.current?.(stage);
-
-          const timeout =
-            parsed.stage === 'image_generation'
-              ? IMAGE_GENERATION_TIMEOUT
-              : DEFAULT_EVENT_TIMEOUT;
-          resetEventTimeout(timeout);
-        } catch (err) {
-          console.error('[SSE] Progress parse error:', err);
-        }
-        return;
-      }
-
-      // Token event
-      if (eventType === 'token') {
-        try {
-          const parsed: TokenEvent = JSON.parse(data);
-          console.log('[SSE] Token:', parsed.content?.slice(0, 20));
-
-          if (parsed.seq) {
-            lastEventSeqRef.current = parsed.seq;
-          }
-
-          accumulatedTextRef.current += parsed.content;
-          setStreamingText(accumulatedTextRef.current);
-          onTokenRef.current?.(parsed.content);
-          resetEventTimeout();
-        } catch (err) {
-          console.error('[SSE] Token parse error:', err);
-        }
-        return;
-      }
-
-      // Token recovery event
-      if (eventType === 'token_recovery') {
-        try {
-          const parsed: TokenRecoveryEvent = JSON.parse(data);
-          console.log('[SSE] Token recovery:', {
-            accumulatedLength: parsed.accumulated?.length,
-            lastSeq: parsed.last_seq,
-            completed: parsed.completed,
-          });
-
-          accumulatedTextRef.current = parsed.accumulated;
-          setStreamingText(parsed.accumulated);
-
-          if (parsed.last_seq) {
-            lastEventSeqRef.current = parsed.last_seq;
-          }
-
-          if (parsed.completed) {
-            console.log('[SSE] Token recovery completed - closing connection');
-            cleanup();
-            setIsStreaming(false);
-            setCurrentStage(null);
-          } else {
-            resetEventTimeout();
-          }
-        } catch (err) {
-          console.error('[SSE] Token recovery parse error:', err);
-        }
-        return;
-      }
-
-      // Done event
-      if (eventType === 'done') {
-        console.log('[SSE] Done event received');
-        cleanup();
-        setIsStreaming(false);
-        setCurrentStage(null);
-
-        try {
-          const parsed: DoneEvent = JSON.parse(data);
-          console.log('[SSE] Done data:', {
-            status: parsed.status,
-            hasResult: !!parsed.result,
-          });
-
-          if (parsed.status === 'completed') {
-            onCompleteRef.current?.(parsed.result);
-          } else {
-            const err = new Error(parsed.message || 'Job failed');
-            setError(err);
-            onErrorRef.current?.(err);
-          }
-        } catch (err) {
-          console.error('[SSE] Done parse error:', err);
-        }
-        return;
-      }
-
-      // Keepalive event
-      if (eventType === 'keepalive') {
-        console.log('[SSE] Keepalive received');
-        resetEventTimeout();
-        return;
-      }
-
-      // Error event from server
-      if (eventType === 'error') {
-        try {
-          const parsed = JSON.parse(data);
-          console.error('[SSE] Server error:', parsed);
-          const err = new Error(parsed.message || 'SSE error');
-          setError(err);
-          onErrorRef.current?.(err);
-          cleanup();
-          setIsStreaming(false);
-          setCurrentStage(null);
-        } catch {
-          console.error('[SSE] Unparseable error event:', data);
-        }
-        return;
-      }
-    },
-    [cleanup, resetEventTimeout],
-  );
 
   // 재연결 시도
   const attemptReconnect = useCallback(
     (jobId: string, reason: string) => {
-      if (isManualDisconnectRef.current) {
-        console.log('[SSE] Skipping reconnect - manual disconnect');
-        return;
-      }
+      if (isManualDisconnectRef.current) return;
 
       if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
         console.error('[SSE] Max reconnect attempts reached');
@@ -358,90 +216,25 @@ export const useAgentSSE = (
 
       reconnectAttemptRef.current += 1;
       const delay =
-        INITIAL_RECONNECT_DELAY *
-        Math.pow(2, reconnectAttemptRef.current - 1);
+        INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttemptRef.current - 1);
 
       console.warn(
-        `[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current}/${MAX_RECONNECT_ATTEMPTS}) - reason: ${reason}`,
+        `[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current}/${MAX_RECONNECT_ATTEMPTS}) - ${reason}`,
       );
 
       cleanup();
       reconnectTimeoutRef.current = setTimeout(() => {
         if (!isManualDisconnectRef.current) {
-          startFetchSSE(jobId);
+          createEventSourceFn(jobId);
         }
       }, delay);
     },
     [cleanup],
   );
 
-  // SSE 텍스트 스트림을 파싱하여 이벤트로 변환
-  const parseSSEStream = useCallback(
-    async (reader: ReadableStreamDefaultReader<Uint8Array>, jobId: string) => {
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            console.log('[SSE] Stream ended');
-            // 스트림이 정상적으로 종료되었지만 done 이벤트를 받지 못한 경우
-            if (isConnectedRef.current && !isManualDisconnectRef.current) {
-              attemptReconnect(jobId, 'stream ended unexpectedly');
-            }
-            break;
-          }
-
-          if (isManualDisconnectRef.current) break;
-
-          buffer += decoder.decode(value, { stream: true });
-
-          // SSE 이벤트는 빈 줄(\n\n)로 구분
-          const events = buffer.split('\n\n');
-          // 마지막 요소는 아직 완성되지 않은 이벤트일 수 있음
-          buffer = events.pop() || '';
-
-          for (const eventStr of events) {
-            if (!eventStr.trim()) continue;
-
-            const sseEvent: SSEEvent = { event: 'message', data: '' };
-            const lines = eventStr.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('event:')) {
-                sseEvent.event = line.slice(6).trim();
-              } else if (line.startsWith('data:')) {
-                sseEvent.data = line.slice(5).trim();
-              } else if (line.startsWith('id:')) {
-                sseEvent.id = line.slice(3).trim();
-              }
-            }
-
-            if (sseEvent.data) {
-              handleSSEEvent(sseEvent);
-            }
-          }
-        }
-      } catch (err) {
-        if (isManualDisconnectRef.current) return;
-
-        const isAbortError =
-          err instanceof DOMException && err.name === 'AbortError';
-
-        if (!isAbortError) {
-          console.error('[SSE] Stream read error:', err);
-          attemptReconnect(jobId, 'stream read error');
-        }
-      }
-    },
-    [handleSSEEvent, attemptReconnect],
-  );
-
-  // Fetch 기반 SSE 연결
-  const startFetchSSE = useCallback(
-    async (jobId: string) => {
+  // Create EventSource
+  const createEventSourceFn = useCallback(
+    (jobId: string) => {
       cleanup();
 
       const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -450,99 +243,203 @@ export const useAgentSSE = (
         ? `${baseUrl}/api/v1/chat/${jobId}/events?last_seq=${lastSeq}`
         : `${baseUrl}/api/v1/chat/${jobId}/events`;
 
-      console.log('[SSE] Creating fetch connection:', {
-        url,
-        lastSeq,
-        attempt: reconnectAttemptRef.current,
-      });
+      console.log('[SSE] Creating EventSource:', { url, lastSeq, attempt: reconnectAttemptRef.current });
 
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
+      const es = new EventSource(url, { withCredentials: true });
+      eventSourceRef.current = es;
 
-      // Health check: 주기적으로 연결 상태 확인
+      // Stale 감지 타이머 (meaningful 이벤트 없으면 polling fallback 트리거)
+      if (!receivedMeaningfulEventRef.current) {
+        staleTimeoutRef.current = setTimeout(() => {
+          if (!receivedMeaningfulEventRef.current && !isManualDisconnectRef.current) {
+            console.warn('[SSE] Stale - no meaningful events received, triggering fallback');
+            onStaleRef.current?.(jobId);
+          }
+        }, STALE_THRESHOLD);
+      }
+
+      // Health check
       healthCheckIntervalRef.current = setInterval(() => {
-        if (!isConnectedRef.current || isManualDisconnectRef.current) return;
+        if (!eventSourceRef.current || isManualDisconnectRef.current) return;
 
+        const readyState = eventSourceRef.current.readyState;
         const timeSinceLastEvent = Date.now() - lastEventTimeRef.current;
+
         console.log('[SSE] Health check:', {
-          connected: isConnectedRef.current,
+          readyState: ['CONNECTING', 'OPEN', 'CLOSED'][readyState],
           timeSinceLastEvent: Math.round(timeSinceLastEvent / 1000) + 's',
+          hasMeaningfulEvent: receivedMeaningfulEventRef.current,
           jobId,
         });
 
-        if (timeSinceLastEvent > currentTimeoutDurationRef.current * 0.8) {
-          console.warn('[SSE] Connection stale, attempting reconnect');
+        if (readyState === EventSource.CLOSED) {
+          attemptReconnect(jobId, 'readyState CLOSED');
+        } else if (
+          readyState === EventSource.OPEN &&
+          timeSinceLastEvent > currentTimeoutDurationRef.current * 0.8
+        ) {
           attemptReconnect(jobId, 'connection stale');
         }
       }, HEALTH_CHECK_INTERVAL);
 
-      try {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Accept: 'text/event-stream',
-            'Cache-Control': 'no-cache',
-          },
-          cache: 'no-store', // Service Worker 캐시 우회
-          signal: abortController.signal,
-          credentials: 'include',
-        });
+      // Meaningful 이벤트 수신 마킹 헬퍼
+      const markMeaningful = () => {
+        receivedMeaningfulEventRef.current = true;
+        if (staleTimeoutRef.current) {
+          clearTimeout(staleTimeoutRef.current);
+          staleTimeoutRef.current = null;
+        }
+      };
 
-        if (!response.ok) {
-          throw new Error(`SSE connection failed: ${response.status}`);
+      // Progress events
+      const handleProgress = (e: Event) => {
+        try {
+          const data: ProgressEvent = JSON.parse((e as MessageEvent).data);
+          console.log('[SSE] Progress:', data.stage, data.status);
+
+          markMeaningful();
+          if (data.seq) lastEventSeqRef.current = data.seq;
+
+          const stage: CurrentStage = {
+            stage: data.stage,
+            status: data.status,
+            progress: data.progress,
+            message: getStageMessage(data.stage),
+          };
+          setCurrentStage(stage);
+          onProgressRef.current?.(stage);
+
+          const timeout =
+            data.stage === 'image_generation'
+              ? IMAGE_GENERATION_TIMEOUT
+              : DEFAULT_EVENT_TIMEOUT;
+          resetEventTimeout(timeout);
+        } catch (err) {
+          console.error('[SSE] Progress parse error:', err);
+        }
+      };
+
+      PROGRESS_STAGES.forEach((stage) => {
+        es.addEventListener(stage, handleProgress);
+      });
+
+      // Token
+      es.addEventListener('token', (e) => {
+        try {
+          const data: TokenEvent = JSON.parse((e as MessageEvent).data);
+          markMeaningful();
+          if (data.seq) lastEventSeqRef.current = data.seq;
+
+          accumulatedTextRef.current += data.content;
+          setStreamingText(accumulatedTextRef.current);
+          onTokenRef.current?.(data.content);
+          resetEventTimeout();
+        } catch (err) {
+          console.error('[SSE] Token parse error:', err);
+        }
+      });
+
+      // Token recovery
+      es.addEventListener('token_recovery', (e) => {
+        try {
+          const data: TokenRecoveryEvent = JSON.parse((e as MessageEvent).data);
+          console.log('[SSE] Token recovery:', {
+            accumulatedLength: data.accumulated?.length,
+            completed: data.completed,
+          });
+
+          markMeaningful();
+          accumulatedTextRef.current = data.accumulated;
+          setStreamingText(data.accumulated);
+
+          if (data.last_seq) lastEventSeqRef.current = data.last_seq;
+
+          if (data.completed) {
+            cleanup();
+            setIsStreaming(false);
+            setCurrentStage(null);
+          } else {
+            resetEventTimeout();
+          }
+        } catch (err) {
+          console.error('[SSE] Token recovery parse error:', err);
+        }
+      });
+
+      // Done
+      es.addEventListener('done', (e) => {
+        console.log('[SSE] Done event received');
+        markMeaningful();
+        cleanup();
+        setIsStreaming(false);
+        setCurrentStage(null);
+
+        try {
+          const data: DoneEvent = JSON.parse((e as MessageEvent).data);
+          if (data.status === 'completed') {
+            onCompleteRef.current?.(data.result);
+          } else {
+            const err = new Error(data.message || 'Job failed');
+            setError(err);
+            onErrorRef.current?.(err);
+          }
+        } catch (err) {
+          console.error('[SSE] Done parse error:', err);
+        }
+      });
+
+      // Keepalive
+      es.addEventListener('keepalive', () => {
+        console.log('[SSE] Keepalive received');
+        resetEventTimeout();
+      });
+
+      // Error
+      es.addEventListener('error', (e) => {
+        const messageEvent = e as MessageEvent;
+        if (messageEvent.data) {
+          try {
+            const data = JSON.parse(messageEvent.data);
+            const err = new Error(data.message || 'SSE error');
+            setError(err);
+            onErrorRef.current?.(err);
+            cleanup();
+            setIsStreaming(false);
+            setCurrentStage(null);
+            return;
+          } catch { /* Not JSON */ }
         }
 
-        if (!response.body) {
-          throw new Error('ReadableStream not supported');
+        if (!isManualDisconnectRef.current) {
+          attemptReconnect(jobId, 'error event');
         }
+      });
 
+      es.onopen = () => {
         console.log('[SSE] Connection opened');
-        isConnectedRef.current = true;
         reconnectAttemptRef.current = 0;
         resetEventTimeout(DEFAULT_EVENT_TIMEOUT);
-
-        const reader = response.body.getReader();
-        await parseSSEStream(reader, jobId);
-      } catch (err) {
-        if (isManualDisconnectRef.current) return;
-
-        const isAbortError =
-          err instanceof DOMException && err.name === 'AbortError';
-
-        if (!isAbortError) {
-          console.error('[SSE] Connection error:', err);
-          attemptReconnect(jobId, 'fetch error');
-        }
-      }
+      };
     },
-    [cleanup, resetEventTimeout, attemptReconnect, parseSSEStream],
+    [cleanup, resetEventTimeout, attemptReconnect],
   );
 
-  // Safari/iOS 대응: visibility change 감지
+  // Visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('[SSE] Tab became visible');
-
         if (
           currentJobIdRef.current &&
-          isConnectedRef.current &&
+          eventSourceRef.current &&
           !isManualDisconnectRef.current
         ) {
+          const readyState = eventSourceRef.current.readyState;
           const timeSinceLastEvent = Date.now() - lastEventTimeRef.current;
 
-          console.log('[SSE] Visibility check:', {
-            timeSinceLastEvent: Math.round(timeSinceLastEvent / 1000) + 's',
-          });
-
-          // 30초 이상 이벤트 없으면 재연결
-          if (timeSinceLastEvent > 30000) {
-            console.warn('[SSE] Reconnecting after visibility change');
+          if (readyState === EventSource.CLOSED || timeSinceLastEvent > 30000) {
             attemptReconnect(currentJobIdRef.current, 'visibility change');
           }
         }
-      } else {
-        console.log('[SSE] Tab became hidden');
       }
     };
 
@@ -557,22 +454,22 @@ export const useAgentSSE = (
     (jobId: string) => {
       console.log('[SSE] Connect called:', jobId);
 
-      // Reset state
       isManualDisconnectRef.current = false;
       currentJobIdRef.current = jobId;
       reconnectAttemptRef.current = 0;
       accumulatedTextRef.current = '';
       lastEventSeqRef.current = null;
       lastEventTimeRef.current = Date.now();
+      receivedMeaningfulEventRef.current = false;
 
       setStreamingText('');
       setCurrentStage(null);
       setError(null);
       setIsStreaming(true);
 
-      startFetchSSE(jobId);
+      createEventSourceFn(jobId);
     },
-    [startFetchSSE],
+    [createEventSourceFn],
   );
 
   // Cleanup on unmount
