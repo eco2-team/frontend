@@ -102,6 +102,8 @@ export const useAgentChat = (
   const currentChatRef = useRef<ChatSummary | null>(null);
   // 현재 전송 중인 user 메시지 client_id 추적
   const pendingUserMessageIdRef = useRef<string | null>(null);
+  // 메시지 전송 시점의 chatId 추적 (세션 전환 시 올바른 채팅에 저장)
+  const pendingChatIdRef = useRef<string | null>(null);
   // 위치 정보 ref (최신 값 보장)
   const userLocationRef =
     useRef<ReturnType<typeof useAgentLocation>['userLocation']>(undefined);
@@ -147,51 +149,80 @@ export const useAgentChat = (
     (result: DoneEvent['result']) => {
       if (!isMountedRef.current) return;
 
-      setMessages((prev) => {
-        let updated = prev;
+      // 메시지가 전송된 원래 chatId
+      const originalChatId = pendingChatIdRef.current;
+      // 현재 보고 있는 chatId
+      const currentChatId = currentChatRef.current?.id;
+      // 세션이 전환되었는지 확인
+      const isSameSession = originalChatId === currentChatId;
 
-        // 1. User 메시지를 committed로 업데이트 (서버 ID 매핑)
+      console.log('[SSE Complete] Session check:', {
+        originalChatId,
+        currentChatId,
+        isSameSession,
+      });
+
+      // Assistant 메시지 생성 (committed 상태)
+      const assistantMessage = createAssistantMessage(result.answer);
+      assistantMessage.status = 'committed';
+      if (result.persistence?.assistant_message) {
+        assistantMessage.server_id = result.persistence.assistant_message;
+        assistantMessage.id = result.persistence.assistant_message;
+      }
+      if (result.persistence?.assistant_message_created_at) {
+        assistantMessage.created_at =
+          result.persistence.assistant_message_created_at;
+      }
+
+      // IndexedDB에 원래 chatId로 저장 (세션 전환과 무관하게)
+      if (originalChatId) {
+        // User 메시지 상태 업데이트
         if (pendingUserMessageIdRef.current) {
-          const userServerId = result.persistence?.user_message;
-          updated = updateMessageInList(
-            updated,
-            pendingUserMessageIdRef.current,
-            (msg) => updateMessageStatus(msg, 'committed', userServerId),
-          );
+          messageDB
+            .updateMessageStatus(
+              pendingUserMessageIdRef.current,
+              'committed',
+              result.persistence?.user_message,
+            )
+            .catch(console.error);
+        }
 
-          // IndexedDB 동기화
-          if (currentChatRef.current?.id) {
-            messageDB
-              .updateMessageStatus(
-                pendingUserMessageIdRef.current,
-                'committed',
-                result.persistence?.user_message,
-              )
-              .catch(console.error);
+        // Assistant 메시지 저장
+        messageDB
+          .saveMessages(userId, originalChatId, [assistantMessage])
+          .catch(console.error);
+      }
+
+      // 같은 세션일 때만 UI 업데이트
+      if (isSameSession) {
+        setMessages((prev) => {
+          let updated = prev;
+
+          // User 메시지를 committed로 업데이트 (서버 ID 매핑)
+          if (pendingUserMessageIdRef.current) {
+            const userServerId = result.persistence?.user_message;
+            updated = updateMessageInList(
+              updated,
+              pendingUserMessageIdRef.current,
+              (msg) => updateMessageStatus(msg, 'committed', userServerId),
+            );
           }
 
-          pendingUserMessageIdRef.current = null;
-        }
+          return [...updated, assistantMessage];
+        });
+      } else {
+        console.log(
+          '[SSE Complete] Session changed, skipping UI update. Message saved to IndexedDB.',
+        );
+      }
 
-        // 2. Assistant 메시지 추가 (committed 상태)
-        const assistantMessage = createAssistantMessage(result.answer);
-        assistantMessage.status = 'committed';
-        // 서버에서 온 persistence 정보로 서버 ID 설정
-        if (result.persistence?.assistant_message) {
-          assistantMessage.server_id = result.persistence.assistant_message;
-          assistantMessage.id = result.persistence.assistant_message;
-        }
-        if (result.persistence?.assistant_message_created_at) {
-          assistantMessage.created_at =
-            result.persistence.assistant_message_created_at;
-        }
-
-        return [...updated, assistantMessage];
-      });
+      // refs 정리
+      pendingUserMessageIdRef.current = null;
+      pendingChatIdRef.current = null;
 
       onMessageComplete?.(result);
     },
-    [onMessageComplete],
+    [userId, onMessageComplete],
   );
 
   // SSE 에러 콜백
@@ -208,6 +239,7 @@ export const useAgentChat = (
         );
         pendingUserMessageIdRef.current = null;
       }
+      pendingChatIdRef.current = null;
 
       setError(err);
       onError?.(err);
@@ -279,6 +311,9 @@ export const useAgentChat = (
           chatId = newChat.id;
         }
 
+        // 원래 chatId 저장 (세션 전환 시에도 올바른 채팅에 저장하기 위함)
+        pendingChatIdRef.current = chatId;
+
         // 이미지 업로드 (직접 전달된 imageUrl이 없을 때만)
         console.log('[DEBUG] Image upload check:', {
           hasImageUrl: !!finalImageUrl,
@@ -336,6 +371,7 @@ export const useAgentChat = (
           );
           pendingUserMessageIdRef.current = null;
         }
+        pendingChatIdRef.current = null;
 
         const sendError =
           err instanceof Error ? err : new Error('Failed to send message');
@@ -408,6 +444,7 @@ export const useAgentChat = (
     setHasMoreHistory(false);
     setHistoryCursor(null);
     pendingUserMessageIdRef.current = null;
+    pendingChatIdRef.current = null;
   }, []);
 
   // 채팅 메시지 로드 (채팅 선택 시) - IndexedDB 우선 + Reconcile
