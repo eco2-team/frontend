@@ -15,6 +15,8 @@ interface AgentMarkdownRendererProps {
   isStreaming?: boolean;
 }
 
+const LINK_SAFETY_OFF = { enabled: false } as const;
+
 type Components = {
   [Key in keyof JSX.IntrinsicElements]?: ComponentType<JSX.IntrinsicElements[Key]> | keyof JSX.IntrinsicElements;
 };
@@ -164,7 +166,7 @@ export const AgentMarkdownRenderer = ({
         components={components}
         isAnimating={isStreaming}
         controls={false}
-        linkSafety={{ enabled: false }}
+        linkSafety={LINK_SAFETY_OFF}
       >
         {content}
       </Streamdown>
