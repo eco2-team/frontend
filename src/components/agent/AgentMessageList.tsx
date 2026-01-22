@@ -82,18 +82,28 @@ export const AgentMessageList = ({
     wasStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
-  // 스트리밍 중 자동 스크롤 (텍스트 업데이트 시) - throttle로 바운싱 방지
-  const lastScrollRef = useRef(0);
+  // 스트리밍 중 자동 스크롤 (requestAnimationFrame으로 부드럽게)
+  const rafRef = useRef<number | null>(null);
   useEffect(() => {
-    if (isStreaming && streamingText) {
-      const now = Date.now();
-      // 200ms throttle
-      if (now - lastScrollRef.current > 200) {
-        lastScrollRef.current = now;
-        scrollToBottom('auto');
+    if (isStreaming && streamingText && isAtBottom) {
+      // 이전 예약된 프레임 취소
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
       }
+      // 다음 프레임에 즉시 스크롤 (instant로 튕김 방지)
+      rafRef.current = requestAnimationFrame(() => {
+        scrollToBottom('instant', true);
+        rafRef.current = null;
+      });
     }
-  }, [isStreaming, streamingText, scrollToBottom]);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, [isStreaming, streamingText, isAtBottom, scrollToBottom]);
 
   return (
     <div

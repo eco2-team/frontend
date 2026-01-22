@@ -10,8 +10,8 @@ interface UseScrollToBottomReturn {
   containerRef: React.RefObject<HTMLDivElement | null>;
   /** 스크롤 버튼 표시 여부 */
   showScrollButton: boolean;
-  /** 하단으로 스크롤 */
-  scrollToBottom: (behavior?: ScrollBehavior) => void;
+  /** 하단으로 스크롤 (force: true면 스킵 로직 무시) */
+  scrollToBottom: (behavior?: ScrollBehavior, force?: boolean) => void;
   /** 현재 하단에 있는지 여부 */
   isAtBottom: boolean;
 }
@@ -60,21 +60,24 @@ export const useScrollToBottom = (threshold = 100): UseScrollToBottomReturn => {
     }
   }, [checkScrollImpl]);
 
-  // 하단으로 스크롤 (이미 하단이면 스킵)
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    if (!containerRef.current) return;
+  // 하단으로 스크롤
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = 'smooth', force = false) => {
+      if (!containerRef.current) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
 
-    // 이미 하단 근처(30px 이내)면 스크롤 스킵 (바운싱 방지)
-    if (distanceFromBottom <= 30) return;
+      // force가 아니면 이미 하단 근처(30px 이내)일 때 스킵
+      if (!force && distanceFromBottom <= 30) return;
 
-    containerRef.current.scrollTo({
-      top: scrollHeight,
-      behavior,
-    });
-  }, []);
+      containerRef.current.scrollTo({
+        top: scrollHeight,
+        behavior,
+      });
+    },
+    [],
+  );
 
   // 스크롤 이벤트 리스너
   useEffect(() => {
