@@ -154,11 +154,11 @@ export const AgentInputBar = ({
       {/* 입력바 */}
       <div className='flex w-full items-end gap-2'>
         {/* 모델 선택 + 갤러리 버튼 */}
-        <div className='relative flex flex-col items-end'>
+        <div className='relative flex flex-col items-center'>
           {/* 모델 선택 버튼 */}
           <button
             onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-            className='ml-4 flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100'
+            className='ml-6 flex items-center gap-0.5 self-end rounded-md px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100'
           >
             {selectedModel.label}
             <ChevronUp
