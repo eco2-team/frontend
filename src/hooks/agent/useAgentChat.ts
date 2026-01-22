@@ -152,10 +152,11 @@ export const useAgentChat = (
 
         // 1. User 메시지를 committed로 업데이트 (서버 ID 매핑)
         if (pendingUserMessageIdRef.current) {
+          const userServerId = result.persistence?.user_message;
           updated = updateMessageInList(
             updated,
             pendingUserMessageIdRef.current,
-            (msg) => updateMessageStatus(msg, 'committed'),
+            (msg) => updateMessageStatus(msg, 'committed', userServerId),
           );
 
           // IndexedDB 동기화
