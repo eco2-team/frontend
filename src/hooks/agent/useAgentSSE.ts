@@ -1,9 +1,8 @@
 /**
  * Agent SSE 토큰 스트리밍 훅
  * - EventSource 기반 (iOS Safari PWA 호환)
- * - 수동 재연결 with exponential backoff
- * - Safari 백그라운드 대응 (visibility change, readyState 모니터링)
- * - Last-Event-ID 기반 복구 (token_recovery)
+ * - 네이티브 Last-Event-ID 복구 (브라우저 자동 재연결 시 헤더 전송)
+ * - Safari 백그라운드 대응 (visibility change, health check)
  * - Stale 감지 콜백 (polling fallback 연동)
  */
 
@@ -80,8 +79,8 @@ interface UseAgentSSEReturn {
   disconnect: () => void;
 }
 
-const MAX_RECONNECT_ATTEMPTS = 5;
-const INITIAL_RECONNECT_DELAY = 1000;
+// 네이티브 EventSource 자동 재연결 시 연속 에러 최대 허용 횟수
+const MAX_CONSECUTIVE_ERRORS = 5;
 
 // 타임아웃 설정
 const DEFAULT_EVENT_TIMEOUT = 60000; // 60초
@@ -106,15 +105,13 @@ export const useAgentSSE = (
   // Refs
   const eventSourceRef = useRef<EventSource | null>(null);
   const currentJobIdRef = useRef<string | null>(null);
-  const reconnectAttemptRef = useRef(0);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consecutiveErrorsRef = useRef(0);
   const eventTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const staleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentTimeoutDurationRef = useRef(DEFAULT_EVENT_TIMEOUT);
   const isManualDisconnectRef = useRef(false);
   const accumulatedTextRef = useRef('');
-  const lastEventSeqRef = useRef<number | null>(null);
   const lastEventTimeRef = useRef<number>(Date.now());
   const receivedMeaningfulEventRef = useRef(false);
 
@@ -136,10 +133,6 @@ export const useAgentSSE = (
   // Cleanup
   const cleanup = useCallback(() => {
     console.log('[SSE] Cleanup called');
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
     if (eventTimeoutRef.current) {
       clearTimeout(eventTimeoutRef.current);
       eventTimeoutRef.current = null;
@@ -192,58 +185,20 @@ export const useAgentSSE = (
     setIsStreaming(false);
     setCurrentStage(null);
     currentJobIdRef.current = null;
-    reconnectAttemptRef.current = 0;
+    consecutiveErrorsRef.current = 0;
     accumulatedTextRef.current = '';
-    lastEventSeqRef.current = null;
     receivedMeaningfulEventRef.current = false;
   }, [cleanup]);
 
-  // 재연결 시도
-  const attemptReconnect = useCallback(
-    (jobId: string, reason: string) => {
-      if (isManualDisconnectRef.current) return;
-
-      if (reconnectAttemptRef.current >= MAX_RECONNECT_ATTEMPTS) {
-        console.error('[SSE] Max reconnect attempts reached');
-        const err = new Error('연결 재시도 횟수 초과');
-        setError(err);
-        onErrorRef.current?.(err);
-        cleanup();
-        setIsStreaming(false);
-        setCurrentStage(null);
-        return;
-      }
-
-      reconnectAttemptRef.current += 1;
-      const delay =
-        INITIAL_RECONNECT_DELAY * Math.pow(2, reconnectAttemptRef.current - 1);
-
-      console.warn(
-        `[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current}/${MAX_RECONNECT_ATTEMPTS}) - ${reason}`,
-      );
-
-      cleanup();
-      reconnectTimeoutRef.current = setTimeout(() => {
-        if (!isManualDisconnectRef.current) {
-          createEventSourceFn(jobId);
-        }
-      }, delay);
-    },
-    [cleanup],
-  );
-
-  // Create EventSource
+  // Create EventSource (네이티브 Last-Event-ID 활용)
   const createEventSourceFn = useCallback(
     (jobId: string) => {
       cleanup();
 
       const baseUrl = import.meta.env.VITE_API_BASE_URL;
-      const lastSeq = lastEventSeqRef.current;
-      const url = lastSeq
-        ? `${baseUrl}/api/v1/chat/${jobId}/events?last_seq=${lastSeq}`
-        : `${baseUrl}/api/v1/chat/${jobId}/events`;
+      const url = `${baseUrl}/api/v1/chat/${jobId}/events`;
 
-      console.log('[SSE] Creating EventSource:', { url, lastSeq, attempt: reconnectAttemptRef.current });
+      console.log('[SSE] Creating EventSource:', { url });
 
       const es = new EventSource(url, { withCredentials: true });
       eventSourceRef.current = es;
@@ -258,7 +213,7 @@ export const useAgentSSE = (
         }, STALE_THRESHOLD);
       }
 
-      // Health check
+      // Health check (EventSource 자동 재연결 실패 시 감지)
       healthCheckIntervalRef.current = setInterval(() => {
         if (!eventSourceRef.current || isManualDisconnectRef.current) return;
 
@@ -269,22 +224,26 @@ export const useAgentSSE = (
           readyState: ['CONNECTING', 'OPEN', 'CLOSED'][readyState],
           timeSinceLastEvent: Math.round(timeSinceLastEvent / 1000) + 's',
           hasMeaningfulEvent: receivedMeaningfulEventRef.current,
+          consecutiveErrors: consecutiveErrorsRef.current,
           jobId,
         });
 
+        // EventSource가 CLOSED 상태면 자동 재연결 실패한 것 → 포기
         if (readyState === EventSource.CLOSED) {
-          attemptReconnect(jobId, 'readyState CLOSED');
-        } else if (
-          readyState === EventSource.OPEN &&
-          timeSinceLastEvent > currentTimeoutDurationRef.current * 0.8
-        ) {
-          attemptReconnect(jobId, 'connection stale');
+          console.error('[SSE] EventSource CLOSED - auto-reconnect failed');
+          const err = new Error('SSE 연결 실패');
+          setError(err);
+          onErrorRef.current?.(err);
+          cleanup();
+          setIsStreaming(false);
+          setCurrentStage(null);
         }
       }, HEALTH_CHECK_INTERVAL);
 
       // Meaningful 이벤트 수신 마킹 헬퍼
       const markMeaningful = () => {
         receivedMeaningfulEventRef.current = true;
+        consecutiveErrorsRef.current = 0;
         if (staleTimeoutRef.current) {
           clearTimeout(staleTimeoutRef.current);
           staleTimeoutRef.current = null;
@@ -298,7 +257,6 @@ export const useAgentSSE = (
           console.log('[SSE] Progress:', data.stage, data.status);
 
           markMeaningful();
-          if (data.seq) lastEventSeqRef.current = data.seq;
 
           const stage: CurrentStage = {
             stage: data.stage,
@@ -328,7 +286,6 @@ export const useAgentSSE = (
         try {
           const data: TokenEvent = JSON.parse((e as MessageEvent).data);
           markMeaningful();
-          if (data.seq) lastEventSeqRef.current = data.seq;
 
           accumulatedTextRef.current += data.content;
           setStreamingText(accumulatedTextRef.current);
@@ -339,7 +296,7 @@ export const useAgentSSE = (
         }
       });
 
-      // Token recovery
+      // Token recovery (재연결 시 서버가 Last-Event-ID 기반으로 누적 텍스트 전송)
       es.addEventListener('token_recovery', (e) => {
         try {
           const data: TokenRecoveryEvent = JSON.parse((e as MessageEvent).data);
@@ -351,8 +308,6 @@ export const useAgentSSE = (
           markMeaningful();
           accumulatedTextRef.current = data.accumulated;
           setStreamingText(data.accumulated);
-
-          if (data.last_seq) lastEventSeqRef.current = data.last_seq;
 
           if (data.completed) {
             cleanup();
@@ -391,12 +346,16 @@ export const useAgentSSE = (
       // Keepalive
       es.addEventListener('keepalive', () => {
         console.log('[SSE] Keepalive received');
+        consecutiveErrorsRef.current = 0;
         resetEventTimeout();
       });
 
-      // Error
+      // Error: 네이티브 EventSource 자동 재연결에 맡김
+      // 서버 에러(data 있음)만 fatal 처리, 네트워크 에러는 브라우저가 Last-Event-ID로 복구
       es.addEventListener('error', (e) => {
         const messageEvent = e as MessageEvent;
+
+        // 서버가 보낸 에러 이벤트 (fatal)
         if (messageEvent.data) {
           try {
             const data = JSON.parse(messageEvent.data);
@@ -410,21 +369,35 @@ export const useAgentSSE = (
           } catch { /* Not JSON */ }
         }
 
-        if (!isManualDisconnectRef.current) {
-          attemptReconnect(jobId, 'error event');
+        // 네트워크 에러: EventSource가 자동 재연결 (Last-Event-ID 헤더 포함)
+        consecutiveErrorsRef.current += 1;
+        console.warn('[SSE] Network error, auto-reconnecting...', {
+          consecutiveErrors: consecutiveErrorsRef.current,
+          readyState: es.readyState,
+        });
+
+        // 연속 에러가 너무 많으면 포기
+        if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+          console.error('[SSE] Too many consecutive errors, giving up');
+          const err = new Error('연결 재시도 횟수 초과');
+          setError(err);
+          onErrorRef.current?.(err);
+          cleanup();
+          setIsStreaming(false);
+          setCurrentStage(null);
         }
       });
 
       es.onopen = () => {
         console.log('[SSE] Connection opened');
-        reconnectAttemptRef.current = 0;
+        consecutiveErrorsRef.current = 0;
         resetEventTimeout(DEFAULT_EVENT_TIMEOUT);
       };
     },
-    [cleanup, resetEventTimeout, attemptReconnect],
+    [cleanup, resetEventTimeout],
   );
 
-  // Visibility change
+  // Visibility change: 백그라운드 복귀 시 EventSource 상태 확인
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -434,11 +407,15 @@ export const useAgentSSE = (
           !isManualDisconnectRef.current
         ) {
           const readyState = eventSourceRef.current.readyState;
-          const timeSinceLastEvent = Date.now() - lastEventTimeRef.current;
+          console.log('[SSE] Visibility restored, readyState:', readyState);
 
-          if (readyState === EventSource.CLOSED || timeSinceLastEvent > 30000) {
-            attemptReconnect(currentJobIdRef.current, 'visibility change');
+          // EventSource가 CLOSED면 자동 재연결 실패한 것 → 새로 생성
+          if (readyState === EventSource.CLOSED) {
+            console.warn('[SSE] Reconnecting after visibility change (CLOSED)');
+            createEventSourceFn(currentJobIdRef.current);
           }
+          // CONNECTING이면 자동 재연결 진행 중 → 대기
+          // OPEN이면 정상 → 아무것도 안함
         }
       }
     };
@@ -447,7 +424,7 @@ export const useAgentSSE = (
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [attemptReconnect]);
+  }, [createEventSourceFn]);
 
   // Connect
   const connect = useCallback(
@@ -456,9 +433,8 @@ export const useAgentSSE = (
 
       isManualDisconnectRef.current = false;
       currentJobIdRef.current = jobId;
-      reconnectAttemptRef.current = 0;
+      consecutiveErrorsRef.current = 0;
       accumulatedTextRef.current = '';
-      lastEventSeqRef.current = null;
       lastEventTimeRef.current = Date.now();
       receivedMeaningfulEventRef.current = false;
 
