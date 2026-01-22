@@ -328,15 +328,21 @@ export const useAgentChat = (
 
         if (!isMountedRef.current) return;
 
+        // 이미지만 전송 시 기본 프롬프트 추가
+        const effectiveMessage =
+          !message.trim() && finalImageUrl
+            ? '이 이미지 분류해줘'
+            : message;
+
         // User 메시지 추가 (Optimistic Update)
-        const userMessage = createUserMessage(message, finalImageUrl);
+        const userMessage = createUserMessage(effectiveMessage, finalImageUrl);
         pendingUserMessageIdRef.current = userMessage.client_id;
         setMessages((prev) => [...prev, userMessage]);
 
         // 요청 데이터 구성 (ref에서 최신 위치 정보 가져옴)
         const currentLocation = userLocationRef.current;
         const requestData: SendMessageRequest = {
-          message,
+          message: effectiveMessage,
           image_url: finalImageUrl || undefined, // 빈 문자열 → undefined (Backend HttpUrl validation)
           user_location: currentLocation,
           model: selectedModel.id,
