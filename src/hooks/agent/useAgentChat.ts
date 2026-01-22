@@ -144,10 +144,22 @@ export const useAgentChat = (
     clearImage,
   } = useImageUpload();
 
+  // Polling fallback refs
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingMessageCountRef = useRef<number>(0);
+
+  const stopPolling = useCallback(() => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  }, []);
+
   // SSE 완료 콜백
   const handleSSEComplete = useCallback(
     (result: DoneEvent['result']) => {
       if (!isMountedRef.current) return;
+      stopPolling(); // SSE 정상 완료 시 polling 중지
 
       // 메시지가 전송된 원래 chatId
       const originalChatId = pendingChatIdRef.current;
@@ -222,7 +234,7 @@ export const useAgentChat = (
 
       onMessageComplete?.(result);
     },
-    [userId, onMessageComplete],
+    [userId, onMessageComplete, stopPolling],
   );
 
   // SSE 에러 콜백
@@ -247,6 +259,82 @@ export const useAgentChat = (
     [onError],
   );
 
+  // SSE stale 시 polling fallback
+  const handleSSEStale = useCallback(
+    (jobId: string) => {
+      const chatId = pendingChatIdRef.current;
+      if (!chatId) return;
+
+      console.log('[Polling] SSE stale detected, starting polling fallback', { jobId, chatId });
+      pollingMessageCountRef.current = messages.length;
+
+      // 3초마다 getChatDetail 폴링
+      pollingIntervalRef.current = setInterval(async () => {
+        try {
+          const response = await AgentService.getChatDetail(chatId, { limit: 5 });
+          const lastMsg = response.messages[response.messages.length - 1];
+
+          // 새 assistant 메시지가 있으면 완료 처리
+          if (lastMsg && lastMsg.role === 'assistant') {
+            console.log('[Polling] Found assistant message via polling');
+            stopPolling();
+
+            // SSE 해제
+            stopGenerationRef.current?.();
+
+            // handleSSEComplete과 동일한 처리
+            const assistantMessage = createAssistantMessage(lastMsg.content);
+            assistantMessage.status = 'committed';
+            assistantMessage.server_id = lastMsg.id;
+            assistantMessage.id = lastMsg.id;
+            assistantMessage.created_at = lastMsg.created_at;
+
+            const originalChatId = pendingChatIdRef.current;
+            const currentChatId = currentChatRef.current?.id;
+            const isSameSession = originalChatId === currentChatId;
+
+            if (originalChatId) {
+              messageDB
+                .saveMessages(userId, originalChatId, [assistantMessage])
+                .catch(console.error);
+            }
+
+            if (isSameSession) {
+              setMessages((prev) => {
+                let updated = prev;
+                if (pendingUserMessageIdRef.current) {
+                  updated = updateMessageInList(
+                    updated,
+                    pendingUserMessageIdRef.current,
+                    (msg) => updateMessageStatus(msg, 'committed'),
+                  );
+                }
+                return [...updated, assistantMessage];
+              });
+            }
+
+            pendingUserMessageIdRef.current = null;
+            pendingChatIdRef.current = null;
+          }
+        } catch (err) {
+          console.error('[Polling] Failed to poll chat detail:', err);
+        }
+      }, 3000);
+
+      // 최대 120초 후 폴링 중단
+      setTimeout(() => {
+        if (pollingIntervalRef.current) {
+          console.warn('[Polling] Max polling duration reached');
+          stopPolling();
+        }
+      }, 120000);
+    },
+    [messages.length, userId, stopPolling],
+  );
+
+  // stopGeneration ref (polling에서 SSE 해제용)
+  const stopGenerationRef = useRef<(() => void) | null>(null);
+
   // SSE
   const {
     streamingText,
@@ -257,7 +345,13 @@ export const useAgentChat = (
   } = useAgentSSE({
     onComplete: handleSSEComplete,
     onError: handleSSEError,
+    onStale: handleSSEStale,
   });
+
+  // stopGeneration ref 동기화
+  useEffect(() => {
+    stopGenerationRef.current = stopGeneration;
+  }, [stopGeneration]);
 
   // 새 채팅 생성
   const createNewChat = useCallback(async (): Promise<ChatSummary> => {
