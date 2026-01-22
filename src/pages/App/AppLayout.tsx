@@ -9,6 +9,12 @@ const AppLayout = () => {
     pathname.startsWith(path),
   );
 
+  // 자체 스크롤을 관리하는 페이지 (외부 스크롤 비활성화)
+  const selfScrollPaths = ['/agent', '/chat'];
+  const isSelfScroll = selfScrollPaths.some((path) =>
+    pathname.startsWith(path),
+  );
+
   const fullScreenPaths = ['/camera', '/map'];
   const isFullScreen = fullScreenPaths.some((path) => pathname === path);
 
@@ -36,7 +42,7 @@ const AppLayout = () => {
 
         {/* <KeepAlive id={location.pathname.split('/')[1]}> */}
         <div
-          className='absolute right-0 left-0 overflow-y-auto'
+          className={`absolute right-0 left-0 ${isSelfScroll ? 'overflow-hidden' : 'overflow-y-auto'}`}
           style={{
             top: showAppHeader ? 'var(--height-app-header)' : 0,
             bottom: showBottomNav ? 'var(--height-bottom-nav)' : 0,
