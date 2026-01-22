@@ -90,7 +90,8 @@ const IMAGE_GENERATION_TIMEOUT = 180000; // 3분
 const HEALTH_CHECK_INTERVAL = 10000; // 10초
 
 // Stale 감지: meaningful 이벤트 없이 이 시간이 지나면 onStale 호출
-const STALE_THRESHOLD = 25000; // 25초
+// Event Router 처리 시간(~1-3초) 후 재연결하면 State 기반 catch-up 가능
+const STALE_THRESHOLD = 3000; // 3초
 
 export const useAgentSSE = (
   options: UseAgentSSEOptions = {},
