@@ -290,7 +290,7 @@ export const useAgentChat = (
         const currentLocation = userLocationRef.current;
         const requestData: SendMessageRequest = {
           message,
-          image_url: finalImageUrl,
+          image_url: finalImageUrl || undefined, // 빈 문자열 → undefined (Backend HttpUrl validation)
           user_location: currentLocation,
           model: selectedModel.id,
         };
@@ -378,7 +378,10 @@ export const useAgentChat = (
       setMessages((prev) => prev.slice(0, messageIndex));
 
       // 재전송 (이미지 URL 포함)
-      await sendMessageInternal(lastUserMessage.content, lastUserMessage.image_url);
+      await sendMessageInternal(
+        lastUserMessage.content,
+        lastUserMessage.image_url || undefined, // 빈 문자열 → undefined
+      );
     },
     [messages, sendMessageInternal],
   );
