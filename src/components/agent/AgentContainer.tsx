@@ -186,17 +186,17 @@ export const AgentContainer = () => {
   );
 
   return (
-    <div className='relative flex h-full w-full flex-col bg-white'>
+    <div className='relative flex h-full w-full flex-col overflow-hidden bg-white'>
       {/* 사이드바 오버레이 (오른쪽) */}
       {sidebarOpen && (
         <>
           {/* 배경 딤 */}
           <div
-            className='fixed inset-0 z-40 bg-black/50'
+            className='absolute inset-0 z-40 bg-black/50'
             onClick={() => setSidebarOpen(false)}
           />
           {/* 사이드바 */}
-          <div className='fixed right-0 top-0 z-50 h-full'>
+          <div className='absolute right-0 top-0 z-50 h-full'>
             <AgentSidebar
               currentChatId={currentChat?.id}
               onSelectChat={handleSelectChat}
