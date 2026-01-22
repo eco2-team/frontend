@@ -220,6 +220,20 @@ export const useAgentChat = (
             );
           }
 
+          // Assistant created_at이 user보다 이전이면 보정 (클라이언트-서버 시계 차이 대응)
+          if (pendingUserMessageIdRef.current) {
+            const userMsg = updated.find(
+              (m) => m.client_id === pendingUserMessageIdRef.current,
+            );
+            if (userMsg) {
+              const userTs = new Date(userMsg.created_at).getTime();
+              const assistantTs = new Date(assistantMessage.created_at).getTime();
+              if (assistantTs <= userTs) {
+                assistantMessage.created_at = new Date(userTs + 1).toISOString();
+              }
+            }
+          }
+
           return [...updated, assistantMessage];
         });
       } else {
@@ -553,6 +567,8 @@ export const useAgentChat = (
       // Session 전환 시 기존 SSE 연결 정리 (다른 세션의 typing indicator 방지)
       stopGeneration();
 
+      // 즉시 messages 초기화 (이전 세션 메시지가 새 세션에 저장되는 것 방지)
+      setMessages([]);
       setIsLoadingHistory(true);
       setError(null);
 
@@ -606,7 +622,7 @@ export const useAgentChat = (
     [userId, stopGeneration, onError],
   );
 
-  // 이전 메시지 더 로드 (위로 스크롤 시) - Reconcile 적용
+  // 이전 메시지 더 로드 (위로 스크롤 시) - 단순 append+dedup
   const loadMoreMessages = useCallback(async () => {
     if (!currentChat?.id || !hasMoreHistory || isLoadingHistory) return;
 
@@ -618,12 +634,27 @@ export const useAgentChat = (
         cursor: historyCursor ?? undefined,
       });
 
-      // Reconcile로 병합 (로컬 pending/committed 유지)
-      setMessages((prev) =>
-        reconcileMessages(prev, response.messages, {
-          committedRetentionMs: 30000,
-        }),
-      );
+      // 기존 메시지 유지 + 서버에서 받은 이전 메시지 중 중복 아닌 것만 추가
+      setMessages((prev) => {
+        const existingIds = new Set(
+          prev.flatMap((m) => [m.server_id, m.client_id, m.id].filter(Boolean)),
+        );
+
+        const newMessages = response.messages
+          .filter((sm) => !existingIds.has(sm.id))
+          .map(serverToClientMessage);
+
+        if (newMessages.length === 0) return prev;
+
+        const merged = [...newMessages, ...prev];
+        // 시간순 정렬 (안정 정렬)
+        merged.sort((a, b) => {
+          const ta = new Date(a.created_at).getTime();
+          const tb = new Date(b.created_at).getTime();
+          return ta - tb;
+        });
+        return merged;
+      });
 
       setHasMoreHistory(response.has_more);
       setHistoryCursor(response.next_cursor);
