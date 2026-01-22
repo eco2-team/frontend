@@ -199,13 +199,18 @@ export const reconcileMessages = (
   });
 
   // 시간순 정렬 (동일 timestamp 시 삽입 순서로 안정 정렬)
-  return Array.from(deduped.values())
-    .sort((a, b) => {
-      const timeDiff = new Date(a.msg.created_at).getTime() - new Date(b.msg.created_at).getTime();
-      if (timeDiff !== 0) return timeDiff;
-      return a.order - b.order;
-    })
-    .map(({ msg }) => msg);
+  const entries = Array.from(deduped.values());
+  // Date 파싱을 sort 외부에서 1회만 수행 (O(N) vs O(N·logN))
+  const withTs = entries.map((entry) => ({
+    ...entry,
+    ts: new Date(entry.msg.created_at).getTime(),
+  }));
+  withTs.sort((a, b) => {
+    const timeDiff = a.ts - b.ts;
+    if (timeDiff !== 0) return timeDiff;
+    return a.order - b.order;
+  });
+  return withTs.map(({ msg }) => msg);
 };
 
 /**
