@@ -32,6 +32,7 @@ import { useImageUpload } from './useImageUpload';
 import { useMessagePersistence } from './useMessagePersistence';
 
 interface UseAgentChatOptions {
+  userId?: string; // User ID for IndexedDB isolation (optional, falls back to 'default')
   onMessageComplete?: (result: DoneEvent['result']) => void;
   onError?: (error: Error) => void;
 }
@@ -81,7 +82,7 @@ interface UseAgentChatReturn {
 export const useAgentChat = (
   options: UseAgentChatOptions = {},
 ): UseAgentChatReturn => {
-  const { onMessageComplete, onError } = options;
+  const { userId = 'default', onMessageComplete, onError } = options;
 
   // 상태
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -125,8 +126,8 @@ export const useAgentChat = (
     console.log('[DEBUG] userLocation updated:', userLocation);
   }, [userLocation]);
 
-  // IndexedDB 자동 저장 (500ms throttle + 1분 cleanup)
-  useMessagePersistence(currentChat?.id || null, messages);
+  // IndexedDB 자동 저장 (500ms throttle + 1분 cleanup, user_id 격리)
+  useMessagePersistence(userId, currentChat?.id || null, messages);
 
   // 이미지
   const {
@@ -398,14 +399,19 @@ export const useAgentChat = (
 
   // 채팅 메시지 로드 (채팅 선택 시) - IndexedDB 우선 + Reconcile
   const loadChatMessages = useCallback(async (chatId: string) => {
+    // Session 전환 시 기존 SSE 연결 정리 (다른 세션의 typing indicator 방지)
+    stopGeneration();
+
     setIsLoadingHistory(true);
     setError(null);
 
     try {
-      // 1. IndexedDB에서 먼저 로드 (즉시 표시)
-      const localMessages = await messageDB.getMessages(chatId);
+      // 1. IndexedDB에서 먼저 로드 (즉시 표시, user_id 격리)
+      const localMessages = await messageDB.getMessages(userId, chatId);
       if (localMessages.length > 0) {
-        console.log(`[IndexedDB] Loaded ${localMessages.length} messages from cache`);
+        console.log(
+          `[IndexedDB] Loaded ${localMessages.length} messages from cache (user: ${userId})`,
+        );
         setMessages(localMessages);
       }
 
@@ -445,7 +451,7 @@ export const useAgentChat = (
     } finally {
       setIsLoadingHistory(false);
     }
-  }, [onError]);
+  }, [userId, stopGeneration, onError]);
 
   // 이전 메시지 더 로드 (위로 스크롤 시) - Reconcile 적용
   const loadMoreMessages = useCallback(async () => {

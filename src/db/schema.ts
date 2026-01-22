@@ -8,10 +8,14 @@ import type { AgentMessage } from '@/api/services/agent';
 
 /**
  * 메시지 레코드 (IndexedDB 저장용)
+ * Backend 스키마와 동일한 계층 구조:
+ * users_accounts.id → chat_conversations.id → chat_messages.id
  */
 export interface MessageRecord extends AgentMessage {
-  /** 채팅 ID (FK) */
-  chat_id: string;
+  /** 사용자 ID (Backend: users_accounts.id) */
+  user_id: string;
+  /** 세션 ID (Backend: chat_conversations.id, Frontend 호출 시 chatId) */
+  session_id: string;
   /**
    * 서버 동기화 완료 여부
    * IndexedDB는 boolean을 0/1로 저장하므로 number 타입 사용
@@ -25,8 +29,8 @@ export interface MessageRecord extends AgentMessage {
  * 동기화 메타데이터
  */
 export interface SyncMetadata {
-  /** 채팅 ID (PK) */
-  chat_id: string;
+  /** 세션 ID (PK, Backend: chat_conversations.id) */
+  session_id: string;
   /** 마지막 서버 동기화 시간 */
   last_sync_at: string;
   /** 페이지네이션 커서 */
@@ -45,13 +49,19 @@ export interface AgentDBSchema extends DBSchema {
    * 메시지 저장소
    */
   messages: {
-    key: string; // client_id
+    key: string; // client_id (PK)
     value: MessageRecord;
     indexes: {
-      /** 채팅별 조회 */
-      'by-chat': string;
-      /** 채팅별 + 시간순 조회 (복합 인덱스) */
-      'by-chat-created': [string, string];
+      /** 사용자별 조회 (users_accounts.id) */
+      'by-user': string;
+      /** 사용자 + 세션별 조회 (chat_conversations.id) */
+      'by-user-session': [string, string];
+      /** 사용자 + 세션 + 시간순 조회 (정렬된 격리 조회) */
+      'by-user-session-created': [string, string, string];
+      /** 세션별 조회 (레거시 호환, session_id) */
+      'by-session': string;
+      /** 세션별 + 시간순 조회 (레거시 호환) */
+      'by-session-created': [string, string];
       /** 상태별 필터 */
       'by-status': string; // MessageStatus
       /** 동기화 여부 */
@@ -65,7 +75,7 @@ export interface AgentDBSchema extends DBSchema {
    * 동기화 메타데이터
    */
   sync_metadata: {
-    key: string; // chat_id
+    key: string; // session_id (Backend: chat_conversations.id)
     value: SyncMetadata;
   };
 }
@@ -73,8 +83,8 @@ export interface AgentDBSchema extends DBSchema {
 /** DB 이름 */
 export const DB_NAME = 'agent-chat-db';
 
-/** DB 버전 */
-export const DB_VERSION = 1;
+/** DB 버전 (v3: session_id 명확한 계층화) */
+export const DB_VERSION = 3;
 
 /** TTL (기본 7일) */
 export const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;

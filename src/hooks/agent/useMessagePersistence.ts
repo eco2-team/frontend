@@ -11,23 +11,26 @@ import { messageDB } from '@/db/messageDB';
 import type { AgentMessage } from '@/api/services/agent';
 
 /**
- * 메시지 IndexedDB 자동 저장
+ * 메시지 IndexedDB 자동 저장 (user_id 격리)
  */
 export const useMessagePersistence = (
+  userId: string,
   chatId: string | null,
   messages: AgentMessage[],
 ) => {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cleanupTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const prevMessagesRef = useRef<AgentMessage[]>([]);
+  const userIdRef = useRef<string>(userId);
   const chatIdRef = useRef<string | null>(chatId);
   const messagesRef = useRef<AgentMessage[]>(messages);
 
   // Refs 동기화 (beforeunload에서 사용)
   useEffect(() => {
+    userIdRef.current = userId;
     chatIdRef.current = chatId;
     messagesRef.current = messages;
-  }, [chatId, messages]);
+  }, [userId, chatId, messages]);
 
   // Pending 메시지 즉시 저장 (throttle 무시)
   // 브라우저 종료 시 데이터 유실 방지
@@ -47,11 +50,11 @@ export const useMessagePersistence = (
     );
 
     if (newPending.length > 0) {
-      messageDB.saveMessages(chatId, newPending).catch((err) => {
+      messageDB.saveMessages(userId, chatId, newPending).catch((err) => {
         console.error('[Persistence] Failed to save pending messages:', err);
       });
     }
-  }, [chatId, messages]);
+  }, [userId, chatId, messages]);
 
   // 기타 메시지 자동 저장 (500ms throttle)
   useEffect(() => {
@@ -79,7 +82,7 @@ export const useMessagePersistence = (
 
     saveTimerRef.current = setTimeout(() => {
       messageDB
-        .saveMessages(chatId, messages)
+        .saveMessages(userId, chatId, messages)
         .catch((err) => {
           console.error('[Persistence] Failed to save messages:', err);
         })
@@ -93,16 +96,17 @@ export const useMessagePersistence = (
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [chatId, messages]);
+  }, [userId, chatId, messages]);
 
   // beforeunload 핸들러 (best-effort 저장)
   const handleBeforeUnload = useCallback(() => {
+    const currentUserId = userIdRef.current;
     const currentChatId = chatIdRef.current;
     const currentMessages = messagesRef.current;
 
     if (currentChatId && currentMessages.length > 0) {
       // IndexedDB는 비동기라 보장 안됨, 하지만 시도는 필요
-      messageDB.saveMessages(currentChatId, currentMessages).catch(() => {
+      messageDB.saveMessages(currentUserId, currentChatId, currentMessages).catch(() => {
         // beforeunload에서는 에러 로깅도 의미 없음
       });
     }
@@ -115,16 +119,18 @@ export const useMessagePersistence = (
     };
   }, [handleBeforeUnload]);
 
-  // 주기적 cleanup (1분마다)
+  // 주기적 cleanup (1분마다, user_id 격리)
   useEffect(() => {
     if (!chatId) return;
 
     cleanupTimerRef.current = setInterval(() => {
-      messageDB.cleanup(chatId, {
-        committedRetentionMs: 30000, // 30초
-      }).catch((err) => {
-        console.error('[Persistence] Failed to cleanup:', err);
-      });
+      messageDB
+        .cleanup(userId, chatId, {
+          committedRetentionMs: 30000, // 30초
+        })
+        .catch((err) => {
+          console.error('[Persistence] Failed to cleanup:', err);
+        });
     }, 60000); // 1분
 
     return () => {
@@ -132,5 +138,5 @@ export const useMessagePersistence = (
         clearInterval(cleanupTimerRef.current);
       }
     };
-  }, [chatId]);
+  }, [userId, chatId]);
 };
