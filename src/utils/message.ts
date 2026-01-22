@@ -146,17 +146,20 @@ export const reconcileMessages = (
   // 병합
   const merged = [...serverConverted, ...localToKeep];
 
-  // 중복 제거 (server_id 우선)
+  // 중복 제거 (server_id 우선, 로컬 image_url 보존)
   const deduped = new Map<string, AgentMessage>();
   merged.forEach((msg) => {
     const key = msg.server_id || msg.client_id;
     if (!deduped.has(key)) {
       deduped.set(key, msg);
     } else {
-      // 이미 있으면 server_id 있는 것 우선
       const existing = deduped.get(key)!;
       if (msg.server_id && !existing.server_id) {
-        deduped.set(key, msg);
+        // 서버 버전 우선, 단 로컬에만 image_url이 있으면 보존
+        const merged = existing.image_url && !msg.image_url
+          ? { ...msg, image_url: existing.image_url }
+          : msg;
+        deduped.set(key, merged);
       }
     }
   });
