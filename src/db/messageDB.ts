@@ -35,17 +35,19 @@ export class MessageDB {
       const self = this;
 
       this.db = await openDB<AgentDBSchema>(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion) {
+        upgrade(db, oldVersion, _newVersion, transaction) {
           console.log(`[MessageDB] Upgrading from ${oldVersion} to ${DB_VERSION}`);
 
-          // v1: 초기 스키마 (레거시)
+          // v1: 초기 스키마 (레거시, v3에서 마이그레이션됨)
           if (oldVersion < 1) {
             // 메시지 저장소
             const msgStore = db.createObjectStore('messages', {
               keyPath: 'client_id',
             });
-            msgStore.createIndex('by-chat', 'chat_id', { unique: false });
-            msgStore.createIndex('by-chat-created', ['chat_id', 'created_at'], {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex('by-chat', 'chat_id', { unique: false });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex('by-chat-created', ['chat_id', 'created_at'], {
               unique: false,
             });
             msgStore.createIndex('by-status', 'status', { unique: false });
@@ -60,16 +62,18 @@ export class MessageDB {
             console.log('[MessageDB] Schema v1 created');
           }
 
-          // v2: user_id 격리 추가 (레거시)
+          // v2: user_id 격리 추가 (레거시, v3에서 마이그레이션됨)
           if (oldVersion < 2) {
-            const msgStore = db.transaction.objectStore('messages');
+            const msgStore = transaction.objectStore('messages');
 
             // 사용자별 격리를 위한 인덱스
             msgStore.createIndex('by-user', 'user_id', { unique: false });
-            msgStore.createIndex('by-user-chat', ['user_id', 'chat_id'], {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex('by-user-chat', ['user_id', 'chat_id'], {
               unique: false,
             });
-            msgStore.createIndex(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (msgStore as any).createIndex(
               'by-user-chat-created',
               ['user_id', 'chat_id', 'created_at'],
               { unique: false },
@@ -80,7 +84,7 @@ export class MessageDB {
 
           // v3: 명확한 계층화 (chat_id → session_id)
           if (oldVersion < 3) {
-            const msgStore = db.transaction.objectStore('messages');
+            const msgStore = transaction.objectStore('messages');
 
             // 기존 레거시 인덱스 삭제
             if (oldVersion >= 2) {
@@ -355,10 +359,11 @@ export class MessageDB {
 
   /**
    * 채팅 전체 삭제 (채팅방 나가기 시)
+   * @param sessionId - Backend: chat_conversations.id (Frontend 호출 시 chatId)
    */
-  async deleteChat(chatId: string): Promise<void> {
+  async deleteChat(sessionId: string): Promise<void> {
     await this.init();
-    const messages = await this.db!.getAllFromIndex('messages', 'by-chat', chatId);
+    const messages = await this.db!.getAllFromIndex('messages', 'by-session', sessionId);
 
     const tx = this.db!.transaction(['messages', 'sync_metadata'], 'readwrite');
 
@@ -368,10 +373,10 @@ export class MessageDB {
     }
 
     // 메타데이터 삭제
-    await tx.objectStore('sync_metadata').delete(chatId);
+    await tx.objectStore('sync_metadata').delete(sessionId);
     await tx.done;
 
-    console.log(`[MessageDB] Deleted chat ${chatId} (${messages.length} messages)`);
+    console.log(`[MessageDB] Deleted session ${sessionId} (${messages.length} messages)`);
   }
 
   /**

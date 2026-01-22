@@ -258,7 +258,7 @@ export const useAgentSSE = (
     });
 
     // Keepalive event (연결 유지, 타임아웃 방지)
-    es.addEventListener('keepalive', (e) => {
+    es.addEventListener('keepalive', () => {
       console.log('[DEBUG] Keepalive event received');
       // 타임아웃 리셋만 수행 (UI 업데이트 불필요)
       resetEventTimeout();
