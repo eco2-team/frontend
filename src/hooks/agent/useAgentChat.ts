@@ -147,6 +147,8 @@ export const useAgentChat = (
   // Polling fallback refs
   const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollingMessageCountRef = useRef<number>(0);
+  // SSE 재연결 시도 횟수 (stale 시 1회 재연결 후 polling)
+  const sseReconnectAttemptRef = useRef(0);
 
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
@@ -273,13 +275,23 @@ export const useAgentChat = (
     [onError],
   );
 
-  // SSE stale 시 polling fallback
+  // SSE stale 시: 1회 재연결 시도 → 실패 시 polling fallback
   const handleSSEStale = useCallback(
     (jobId: string) => {
       const chatId = pendingChatIdRef.current;
       if (!chatId) return;
 
-      console.log('[Polling] SSE stale detected, starting polling fallback', { jobId, chatId });
+      // 최대 3회 SSE 재연결 시도 (gateway State catch-up 기대)
+      const MAX_SSE_RECONNECTS = 3;
+      if (sseReconnectAttemptRef.current < MAX_SSE_RECONNECTS) {
+        sseReconnectAttemptRef.current += 1;
+        console.log(`[SSE] Stale - reconnecting (attempt ${sseReconnectAttemptRef.current}/${MAX_SSE_RECONNECTS})`, { jobId });
+        connectSSERef.current?.(jobId);
+        return;
+      }
+
+      // 재연결 모두 실패: polling fallback
+      console.log('[Polling] SSE stale after reconnect, starting polling fallback', { jobId, chatId });
       pollingMessageCountRef.current = messages.length;
 
       // 3초마다 getChatDetail 폴링
@@ -346,8 +358,9 @@ export const useAgentChat = (
     [messages.length, userId, stopPolling],
   );
 
-  // stopGeneration ref (polling에서 SSE 해제용)
+  // SSE 함수 refs (circular dependency 방지)
   const stopGenerationRef = useRef<(() => void) | null>(null);
+  const connectSSERef = useRef<((jobId: string) => void) | null>(null);
 
   // SSE
   const {
@@ -362,10 +375,11 @@ export const useAgentChat = (
     onStale: handleSSEStale,
   });
 
-  // stopGeneration ref 동기화
+  // SSE 함수 ref 동기화
   useEffect(() => {
     stopGenerationRef.current = stopGeneration;
-  }, [stopGeneration]);
+    connectSSERef.current = connectSSE;
+  }, [stopGeneration, connectSSE]);
 
   // 새 채팅 생성
   const createNewChat = useCallback(async (): Promise<ChatSummary> => {
@@ -472,6 +486,7 @@ export const useAgentChat = (
 
         // SSE 연결
         console.log('[DEBUG] Connecting to SSE with job_id:', response.job_id);
+        sseReconnectAttemptRef.current = 0;
         connectSSE(response.job_id);
       } catch (err) {
         if (!isMountedRef.current) return;
