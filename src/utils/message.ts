@@ -156,7 +156,13 @@ export const reconcileMessages = (
       return true;
     }
 
-    // committed는 retention 기간 내면 유지 (Eventual Consistency 버퍼)
+    // server_id 있는 committed: 서버에서 확인된 메시지 → 유지
+    // (다른 페이지에서 로드된 메시지일 수 있으므로 드롭하면 안 됨)
+    if (local.status === 'committed' && local.server_id) {
+      return true;
+    }
+
+    // committed without server_id: retention 기간 내 유지 (Eventual Consistency 버퍼)
     if (local.status === 'committed' && !local.server_id) {
       const age = now - new Date(local.created_at).getTime();
       return age < committedRetentionMs;
@@ -174,27 +180,32 @@ export const reconcileMessages = (
   const merged = [...serverConverted, ...localToKeep];
 
   // 중복 제거 (server_id 우선, 로컬 image_url 보존)
-  const deduped = new Map<string, AgentMessage>();
-  merged.forEach((msg) => {
+  // 삽입 순서(= 서버 응답 순서)를 tiebreaker로 보존
+  const deduped = new Map<string, { msg: AgentMessage; order: number }>();
+  merged.forEach((msg, idx) => {
     const key = msg.server_id || msg.client_id;
     if (!deduped.has(key)) {
-      deduped.set(key, msg);
+      deduped.set(key, { msg, order: idx });
     } else {
       const existing = deduped.get(key)!;
-      if (msg.server_id && !existing.server_id) {
+      if (msg.server_id && !existing.msg.server_id) {
         // 서버 버전 우선, 단 로컬에만 image_url이 있으면 보존
-        const merged = existing.image_url && !msg.image_url
-          ? { ...msg, image_url: existing.image_url }
+        const mergedMsg = existing.msg.image_url && !msg.image_url
+          ? { ...msg, image_url: existing.msg.image_url }
           : msg;
-        deduped.set(key, merged);
+        deduped.set(key, { msg: mergedMsg, order: existing.order });
       }
     }
   });
 
-  // 시간순 정렬
-  return Array.from(deduped.values()).sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-  );
+  // 시간순 정렬 (동일 timestamp 시 삽입 순서로 안정 정렬)
+  return Array.from(deduped.values())
+    .sort((a, b) => {
+      const timeDiff = new Date(a.msg.created_at).getTime() - new Date(b.msg.created_at).getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return a.order - b.order;
+    })
+    .map(({ msg }) => msg);
 };
 
 /**
