@@ -1,20 +1,97 @@
 /**
  * Agent 이미지 컴포넌트 (마크다운 이미지 렌더링)
  * - 라이트 테마 적용
+ * - 길게 누르면 다운로드 옵션 표시
  */
 
-import { useState } from 'react';
-import { ImageOff, X, Download, Loader2 } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { ImageOff, Download, Loader2 } from 'lucide-react';
 
 interface AgentImageProps {
   src?: string;
   alt?: string;
 }
 
+const LONG_PRESS_DURATION = 500; // ms
+
 export const AgentImage = ({ src, alt }: AgentImageProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDownload, setShowDownload] = useState(false);
+
+  // Long press 감지
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLongPress = useRef(false);
+
+  // 모달 닫기 함수
+  const closeModal = useCallback(() => {
+    setIsExpanded(false);
+    setShowDownload(false);
+    isLongPress.current = false;
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  // ESC 키, 뒤로가기 처리
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    };
+
+    const handlePopState = () => {
+      closeModal();
+    };
+
+    // 모달 열릴 때 히스토리 추가 (뒤로가기 지원)
+    window.history.pushState({ imageModal: true }, '');
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isExpanded, closeModal]);
+
+  // 컴포넌트 언마운트 시 정리
+  useEffect(() => {
+    return () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
+    };
+  }, []);
+
+  const handleTouchStart = useCallback(() => {
+    isLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      setShowDownload(true);
+    }, LONG_PRESS_DURATION);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleImageClick = useCallback((e: React.MouseEvent) => {
+    // 길게 눌러서 다운로드 버튼이 떴다면 클릭 무시
+    if (isLongPress.current) {
+      e.stopPropagation();
+      return;
+    }
+  }, []);
 
   if (!src) return null;
 
@@ -59,34 +136,40 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
       {isExpanded && (
         <div
           className='fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4'
-          onClick={() => setIsExpanded(false)}
+          onClick={closeModal}
         >
-          {/* 닫기 버튼 */}
-          <button
-            onClick={() => setIsExpanded(false)}
-            className='absolute right-4 top-4 rounded-full bg-white p-2 text-gray-700 shadow-lg transition-colors hover:bg-gray-100'
-          >
-            <X className='h-6 w-6' />
-          </button>
+          {/* 확대 이미지 (길게 누르면 다운로드 옵션) */}
+          <div className='relative'>
+            <img
+              src={src}
+              alt={alt || '이미지'}
+              onClick={handleImageClick}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+              onMouseDown={handleTouchStart}
+              onMouseUp={handleTouchEnd}
+              onMouseLeave={handleTouchEnd}
+              className='max-h-[90vh] max-w-[90vw] rounded-lg object-contain select-none'
+              draggable={false}
+            />
 
-          {/* 확대 이미지 */}
-          <img
-            src={src}
-            alt={alt || '이미지'}
-            onClick={(e) => e.stopPropagation()}
-            className='max-h-[90vh] max-w-[90vw] rounded-lg object-contain'
-          />
-
-          {/* 다운로드 버튼 */}
-          <a
-            href={src}
-            download
-            onClick={(e) => e.stopPropagation()}
-            className='bg-brand-primary absolute bottom-4 right-4 flex items-center gap-2 rounded-lg px-4 py-2 text-white shadow-lg transition-colors hover:opacity-90'
-          >
-            <Download className='h-5 w-5' />
-            <span>다운로드</span>
-          </a>
+            {/* 다운로드 버튼 (길게 누르면 표시) */}
+            {showDownload && (
+              <a
+                href={src}
+                download
+                onClick={(e) => {
+                  e.stopPropagation();
+                  closeModal();
+                }}
+                className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 rounded-xl bg-white/90 px-6 py-4 text-gray-700 shadow-lg backdrop-blur-sm transition-all'
+              >
+                <Download className='h-8 w-8' />
+                <span className='text-sm font-medium'>저장</span>
+              </a>
+            )}
+          </div>
         </div>
       )}
     </>

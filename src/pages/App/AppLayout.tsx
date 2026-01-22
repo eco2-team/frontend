@@ -9,7 +9,7 @@ const AppLayout = () => {
     pathname.startsWith(path),
   );
 
-  const fullScreenPaths = ['/camera', '/map', '/agent'];
+  const fullScreenPaths = ['/camera', '/map'];
   const isFullScreen = fullScreenPaths.some((path) => pathname === path);
 
   const showAppHeaderPaths = [

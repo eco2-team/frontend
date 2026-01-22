@@ -15,7 +15,7 @@ const tabs = [
     icon: homeInActive,
     activeIcon: homeActive,
   },
-  { path: '/chat', label: 'CHAT', icon: chatInActive },
+  { path: '/agent', label: 'CHAT', icon: chatInActive },
   { path: '/camera', label: 'CAMERA', icon: camera, isCenter: true },
   {
     path: '/info',
@@ -60,7 +60,7 @@ const BottomNav = () => {
 
   const handleNavigate = (path: string) => {
     navigate(path, {
-      replace: path === '/chat' || path === '/camera' ? false : true,
+      replace: path === '/agent' || path === '/camera' ? false : true,
     });
   };
 

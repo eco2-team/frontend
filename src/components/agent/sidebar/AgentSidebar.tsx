@@ -1,11 +1,14 @@
 /**
  * Agent 사이드바
  * - 라이트 테마 적용
+ * - Pull-to-refresh 지원
+ * - 무한 스크롤 (IntersectionObserver)
  */
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Search, Plus, X } from 'lucide-react';
+import PullToRefresh from 'react-simple-pull-to-refresh';
+import { Search, Plus, X, Loader2 } from 'lucide-react';
 import { AgentService } from '@/api/services/agent';
 import type { ChatSummary } from '@/api/services/agent';
 import { AgentSidebarItem } from './AgentSidebarItem';
@@ -27,8 +30,8 @@ export const AgentSidebar = ({
 }: AgentSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 대화 목록 무한 스크롤
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+  // 대화 목록 무한 스크롤 + Pull-to-refresh
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
     useInfiniteQuery({
       queryKey: ['agent', 'chats'],
       queryFn: ({ pageParam }) =>
@@ -36,6 +39,37 @@ export const AgentSidebar = ({
       getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
       initialPageParam: undefined as string | undefined,
     });
+
+  // Pull-to-refresh 핸들러
+  const handleRefresh = async () => {
+    await refetch();
+  };
+
+  // 무한 스크롤 (IntersectionObserver)
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  const handleIntersect = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [hasNextPage, isFetchingNextPage, fetchNextPage],
+  );
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(handleIntersect, {
+      threshold: 0.1,
+    });
+
+    observer.observe(target);
+
+    return () => observer.disconnect();
+  }, [handleIntersect]);
 
   // 모든 대화 목록
   const allChats = data?.pages.flatMap((page) => page.chats) ?? [];
@@ -89,47 +123,61 @@ export const AgentSidebar = ({
         </button>
       </div>
 
-      {/* 대화 목록 */}
-      <div className='no-scrollbar flex-1 overflow-y-auto px-3'>
-        {filteredChats.length === 0 ? (
-          <div className='flex flex-col items-center justify-center py-12 text-center'>
-            <p className='text-text-inactive text-sm'>
-              {searchQuery ? '검색 결과가 없습니다' : '대화가 없습니다'}
-            </p>
-            {!searchQuery && (
-              <button
-                onClick={onNewChat}
-                className='text-brand-primary mt-3 text-sm hover:underline'
-              >
-                새 대화 시작하기
-              </button>
-            )}
+      {/* 대화 목록 (Pull-to-refresh) */}
+      <PullToRefresh
+        onRefresh={handleRefresh}
+        pullingContent={
+          <div className='flex justify-center py-2 text-gray-400'>
+            ↓ 당겨서 새로고침
           </div>
-        ) : (
-          <div className='space-y-1 pb-4'>
-            {filteredChats.map((chat) => (
-              <AgentSidebarItem
-                key={chat.id}
-                item={chat}
-                isActive={chat.id === currentChatId}
-                onClick={() => onSelectChat(chat)}
-                onDelete={onDeleteChat ? () => onDeleteChat(chat.id) : undefined}
-              />
-            ))}
+        }
+        refreshingContent={
+          <div className='flex justify-center py-3'>
+            <Loader2 className='h-5 w-5 animate-spin text-gray-500' />
+          </div>
+        }
+        className='no-scrollbar flex-1 overflow-y-auto'
+      >
+        <div className='px-3'>
+          {filteredChats.length === 0 ? (
+            <div className='flex flex-col items-center justify-center py-12 text-center'>
+              <p className='text-text-inactive text-sm'>
+                {searchQuery ? '검색 결과가 없습니다' : '대화가 없습니다'}
+              </p>
+              {!searchQuery && (
+                <button
+                  onClick={onNewChat}
+                  className='text-brand-primary mt-3 text-sm hover:underline'
+                >
+                  새 대화 시작하기
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className='space-y-1 pb-4'>
+              {filteredChats.map((chat) => (
+                <AgentSidebarItem
+                  key={chat.id}
+                  item={chat}
+                  isActive={chat.id === currentChatId}
+                  onClick={() => onSelectChat(chat)}
+                  onDelete={onDeleteChat ? () => onDeleteChat(chat.id) : undefined}
+                />
+              ))}
 
-            {/* 더 불러오기 */}
-            {hasNextPage && (
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                className='text-text-inactive w-full py-2 text-center text-sm hover:text-gray-700'
-              >
-                {isFetchingNextPage ? '불러오는 중...' : '더 보기'}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+              {/* 무한 스크롤 트리거 */}
+              <div ref={loadMoreRef} className='h-1' />
+
+              {/* 로딩 인디케이터 */}
+              {isFetchingNextPage && (
+                <div className='flex justify-center py-3'>
+                  <Loader2 className='h-4 w-4 animate-spin text-gray-400' />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </PullToRefresh>
     </aside>
   );
 };

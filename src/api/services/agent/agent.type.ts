@@ -85,8 +85,27 @@ export interface ChatListParams {
 /** 메시지 역할 */
 export type MessageRole = 'user' | 'assistant';
 
+/** 메시지 상태 (Optimistic Update 지원) */
+export type MessageStatus = 'pending' | 'streaming' | 'committed' | 'failed';
+
 /** 메시지 */
 export interface AgentMessage {
+  /** 클라이언트 생성 ID (UUID) - 항상 존재 */
+  client_id: string;
+  /** 서버 DB ID - committed 후에만 존재 */
+  server_id?: string;
+  /** 레거시 호환용 (server_id || client_id) */
+  id: string;
+  role: MessageRole;
+  content: string;
+  created_at: string;
+  image_url?: string;
+  /** 메시지 상태 */
+  status: MessageStatus;
+}
+
+/** 서버에서 받은 메시지 (status 없음) */
+export interface ServerMessage {
   id: string;
   role: MessageRole;
   content: string;
@@ -228,6 +247,7 @@ export interface UpdateChatTitleRequest {
 /** 채팅 상세 요청 파라미터 */
 export interface ChatDetailParams {
   limit?: number;
+  /** 페이징 커서 (ISO 8601 타임스탬프) */
   cursor?: string;
 }
 
@@ -235,7 +255,7 @@ export interface ChatDetailParams {
 export interface ChatDetailResponse {
   id: string;
   title: string | null;
-  messages: AgentMessage[];
+  messages: ServerMessage[];
   has_more: boolean;
   next_cursor: string | null;
   created_at: string;

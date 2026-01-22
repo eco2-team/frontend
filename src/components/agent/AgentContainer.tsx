@@ -6,24 +6,29 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Menu, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AgentService, AVAILABLE_MODELS } from '@/api/services/agent';
-import type { ChatSummary, ModelOption } from '@/api/services/agent';
+import { AgentService } from '@/api/services/agent';
+import type { ChatSummary } from '@/api/services/agent';
 import { useAgentChat, useMessageQueue } from '@/hooks/agent';
 import type { QueuedMessage } from '@/hooks/agent/useMessageQueue';
 import { AgentSidebar } from './sidebar';
 import { AgentMessageList } from './AgentMessageList';
 import { AgentInputBar } from './AgentInputBar';
 import { AgentMessageQueue } from './AgentMessageQueue';
+import GoBack from '@/assets/icons/go_back.svg';
 
 export const AgentContainer = () => {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // 이전 스트리밍 상태 추적 (큐 처리용)
   const wasStreamingRef = useRef(false);
+
+  // 초기 로드 여부 추적
+  const initialLoadDone = useRef(false);
 
   // Agent 채팅 훅
   const {
@@ -52,17 +57,30 @@ export const AgentContainer = () => {
     clearMessages,
   } = useAgentChat();
 
-  // 모델 선택 핸들러
-  const handleModelSelect = useCallback(
-    (model: ModelOption) => {
-      setSelectedModel(model);
-      setModelDropdownOpen(false);
-    },
-    [setSelectedModel],
-  );
-
   // 메시지 큐
   const { queuedMessages, enqueue, remove, dequeue } = useMessageQueue();
+
+  // 초기 로드: 가장 최근 채팅 자동 로드 (한 번만 실행)
+  useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
+    const loadRecentChat = async () => {
+      try {
+        const response = await AgentService.getChatList({ limit: 1 });
+        if (response.chats.length > 0) {
+          const recentChat = response.chats[0];
+          setCurrentChat(recentChat);
+          loadChatMessages(recentChat.id);
+        }
+      } catch (err) {
+        console.error('Failed to load recent chat:', err);
+      }
+    };
+
+    loadRecentChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 대화 삭제 뮤테이션
   const deleteChatMutation = useMutation({
@@ -174,61 +192,20 @@ export const AgentContainer = () => {
       )}
 
       {/* 헤더 */}
-      <header className='border-stroke-default flex items-center justify-between border-b bg-white px-4 py-3'>
-        <h1 className='text-text-primary text-sm font-medium'>
-          {currentChat?.title || '새 대화'}
-        </h1>
+      <header className='flex items-center justify-between bg-white px-4 py-3'>
+        <button
+          onClick={() => navigate(-1)}
+          className='flex h-8 w-8 items-center justify-center'
+        >
+          <img src={GoBack} alt='뒤로가기' className='h-6 w-6' />
+        </button>
         <button
           onClick={() => setSidebarOpen(true)}
-          className='text-text-primary rounded p-2 transition-colors hover:bg-gray-100'
+          className='text-text-primary flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-gray-100'
         >
           <Menu className='h-5 w-5' />
         </button>
       </header>
-
-      {/* 모델 선택 (메시지가 없을 때만 표시) */}
-      {messages.length === 0 && !isStreaming && (
-        <div className='flex justify-center px-4 pt-4'>
-          <div className='relative'>
-            <button
-              onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-              className='flex items-center gap-1 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50'
-            >
-              {selectedModel.label}
-              <ChevronDown className='h-4 w-4' />
-            </button>
-
-            {modelDropdownOpen && (
-              <>
-                <div
-                  className='fixed inset-0 z-10'
-                  onClick={() => setModelDropdownOpen(false)}
-                />
-                <div className='absolute left-1/2 top-full z-20 mt-1 w-48 -translate-x-1/2 rounded-lg border border-gray-200 bg-white py-1 shadow-lg'>
-                  {AVAILABLE_MODELS.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => handleModelSelect(model)}
-                      className={`flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-gray-50 ${
-                        selectedModel.id === model.id ? 'bg-gray-50' : ''
-                      }`}
-                    >
-                      <span className='text-sm font-medium text-gray-900'>
-                        {model.label}
-                      </span>
-                      {model.description && (
-                        <span className='text-xs text-gray-500'>
-                          {model.description}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* 메시지 리스트 */}
       <AgentMessageList
@@ -263,6 +240,8 @@ export const AgentContainer = () => {
           isUploading={isUploading}
           onSelectImage={selectImage}
           onClearImage={clearImage}
+          selectedModel={selectedModel}
+          onSelectModel={setSelectedModel}
         />
       </div>
     </div>

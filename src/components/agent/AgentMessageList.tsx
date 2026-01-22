@@ -3,7 +3,7 @@
  * - Chat UI 스타일 적용 (이코 캐릭터, 라이트 테마)
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
 import EcoImg from '@/assets/images/mainCharacter/main_1.png';
 import type {
@@ -46,6 +46,9 @@ export const AgentMessageList = ({
   const { containerRef, showScrollButton, scrollToBottom, isAtBottom } =
     useScrollToBottom();
 
+  // 이전 스트리밍 상태 추적
+  const wasStreamingRef = useRef(false);
+
   // 위로 스크롤 시 이전 메시지 로드
   const handleScroll = () => {
     if (!containerRef.current || !hasMoreHistory || isLoadingHistory) return;
@@ -62,20 +65,41 @@ export const AgentMessageList = ({
     if (isAtBottom) {
       scrollToBottom('auto');
     }
-  }, [messages, streamingText, isAtBottom, scrollToBottom]);
+  }, [messages, isAtBottom, scrollToBottom]);
 
-  // 스트리밍 시작 시 스크롤
+  // 스트리밍 시작 시 강제 스크롤 (... 나올 때)
   useEffect(() => {
-    if (isStreaming && isAtBottom) {
-      scrollToBottom('auto');
+    // false → true 변경 시에만 스크롤
+    if (isStreaming && !wasStreamingRef.current) {
+      // 강제로 하단 스크롤 (스킵 로직 무시)
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: containerRef.current.scrollHeight,
+          behavior: 'smooth',
+        });
+      }
     }
-  }, [isStreaming, isAtBottom, scrollToBottom]);
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  // 스트리밍 중 자동 스크롤 (텍스트 업데이트 시) - throttle로 바운싱 방지
+  const lastScrollRef = useRef(0);
+  useEffect(() => {
+    if (isStreaming && streamingText) {
+      const now = Date.now();
+      // 200ms throttle
+      if (now - lastScrollRef.current > 200) {
+        lastScrollRef.current = now;
+        scrollToBottom('auto');
+      }
+    }
+  }, [isStreaming, streamingText, scrollToBottom]);
 
   return (
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className='no-scrollbar relative flex-1 overflow-y-auto bg-white'
+      className='no-scrollbar relative flex-1 overflow-y-auto bg-white [overflow-anchor:auto]'
     >
       <div className='px-6 pb-4'>
         {/* 이전 메시지 로딩 인디케이터 */}
@@ -99,19 +123,6 @@ export const AgentMessageList = ({
             >
               이전 대화 더 보기
             </button>
-          </div>
-        )}
-
-        {/* 빈 상태 - 시작 메시지 */}
-        {messages.length === 0 && !isStreaming && !isLoadingHistory && (
-          <div className='flex w-full flex-row justify-start gap-[7px] pt-[15px]'>
-            <img src={EcoImg} alt='이코' className='h-9 w-9' />
-            <div className='flex w-full flex-col items-start gap-2'>
-              <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)]'>
-                안녕하세요! 저는 이코예요 분리수거에 대해 궁금한게 있으면
-                물어봐주세요!
-              </div>
-            </div>
           </div>
         )}
 
@@ -152,8 +163,8 @@ export const AgentMessageList = ({
           <div className='flex w-full flex-row justify-start gap-[7px] pt-[15px]'>
             <img src={EcoImg} alt='이코' className='h-9 w-9' />
             <div className='flex w-full flex-col items-start gap-2'>
-              <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)]'>
-                <AgentMarkdownRenderer content={streamingText} />
+              <div className='border-stroke-default text-text-primary inline-block max-w-[80%] rounded-[6px_16px_16px_16px] border-[0.676px] bg-[#F9FAFB] p-4 text-[13px] leading-[21.125px] font-normal tracking-[-0.076px] shadow-[0_4px_6px_-1px_rgba(0,0,0,0.10),0_2px_4px_-2px_rgba(0,0,0,0.10)] break-words'>
+                <AgentMarkdownRenderer content={streamingText} isStreaming />
                 <span className='bg-brand-primary ml-1 inline-block h-4 w-0.5 animate-pulse' />
               </div>
             </div>

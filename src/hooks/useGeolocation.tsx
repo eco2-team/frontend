@@ -56,14 +56,11 @@ export const useGeolocation = (): UseGeolocationReturn => {
           };
         } catch {
           // Permissions API 지원 안 하는 경우 무시
-          console.log('Permissions API not fully supported');
         }
       }
     };
 
     checkPermission();
-
-    console.log('🔍 위치 정보 요청 중...');
 
     const handleSuccess = (pos: GeolocationPosition) => {
       const location = {
@@ -79,8 +76,6 @@ export const useGeolocation = (): UseGeolocationReturn => {
     };
 
     const handleError = (err: GeolocationError) => {
-      console.error('❌ 위치 정보 에러:', err);
-
       let errorMsg = '위치 정보를 가져올 수 없습니다.';
 
       // 에러 타입별 상세 메시지
