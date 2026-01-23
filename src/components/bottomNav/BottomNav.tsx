@@ -65,7 +65,7 @@ const BottomNav = () => {
   };
 
   return (
-    <nav className='h-bottom-nav max-w-app absolute bottom-0 left-1/2 z-1000 flex w-full -translate-x-1/2 items-center justify-between border-t border-gray-200 bg-white px-10 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
+    <nav className='max-w-app absolute bottom-0 left-1/2 z-1000 flex w-full -translate-x-1/2 items-center justify-between border-t border-gray-200 bg-white px-10 pb-[env(safe-area-inset-bottom)] pt-3 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]' style={{ minHeight: 'var(--height-bottom-nav)' }}>
       {tabs.map(({ path, label, icon, activeIcon, isCenter }) => (
         <NavLink
           key={path}
