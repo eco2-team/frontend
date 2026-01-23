@@ -45,7 +45,9 @@ const AppLayout = () => {
           className={`absolute right-0 left-0 ${isSelfScroll ? 'overflow-hidden' : 'overflow-y-auto'}`}
           style={{
             top: showAppHeader ? 'var(--height-app-header)' : 0,
-            bottom: showBottomNav ? 'var(--height-bottom-nav)' : 0,
+            bottom: showBottomNav
+              ? 'calc(var(--height-bottom-nav) + env(safe-area-inset-bottom))'
+              : 0,
           }}
         >
           <Outlet />
