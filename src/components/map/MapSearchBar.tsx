@@ -78,7 +78,7 @@ export const MapSearchBar = ({ onSearch, onSuggestSelect }: MapSearchBarProps) =
   }, []);
 
   return (
-    <div ref={containerRef} className='absolute top-3 left-3 right-3 z-40'>
+    <div ref={containerRef} className='absolute top-[calc(0.75rem+env(safe-area-inset-top))] left-3 right-3 z-40'>
       <form onSubmit={handleSubmit} className='relative'>
         <div className='flex items-center rounded-xl border border-gray-200 bg-white shadow-md'>
           <svg
