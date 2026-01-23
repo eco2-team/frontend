@@ -58,7 +58,7 @@ export const MapDetailSheet = ({ centerId, onClose }: MapDetailSheetProps) => {
 
   return (
     <div className='absolute bottom-0 left-0 right-0 z-50 animate-slide-up'>
-      <div className='rounded-t-2xl border-t border-gray-200 bg-white px-5 pb-6 pt-4 shadow-xl'>
+      <div className='rounded-t-2xl border-t border-gray-200 bg-white px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4 shadow-xl'>
         {/* 핸들 바 */}
         <div className='mb-4 flex justify-center'>
           <div className='h-1 w-10 rounded-full bg-gray-300' />
