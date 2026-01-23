@@ -119,6 +119,7 @@
 /* PWA standalone 모드: 디바이스 전체 화면 사용 */
 html.pwa-standalone body {
   align-items: stretch;
+  min-height: 100dvh;
 }
 
 html.pwa-standalone #root {
