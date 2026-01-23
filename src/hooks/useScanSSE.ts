@@ -137,53 +137,43 @@ export const useScanSSE = (options?: UseScanSSEOptions): UseScanSSEReturn => {
         console.log('✅ SSE 연결 성공');
       };
 
-      // SSE 메시지 핸들러 (unnamed events)
-      eventSource.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as ScanSSEEvent;
-          console.log(`📨 SSE 이벤트 수신 [${data.stage}]:`, data);
+      // SSE 이벤트 공통 핸들러
+      const handleEvent = (data: ScanSSEEvent) => {
+        console.log(`[Scan SSE] ${data.stage}:${data.status} seq=${data.seq}`);
 
-          // Stage → Step 변환 (역순 방지)
+        // completed 이벤트만 step 전진
+        if (data.status === 'completed') {
           const step = STAGE_TO_STEP[data.stage] ?? 0;
           setCurrentStep((prev) => Math.max(prev, step));
+        }
 
-          // 완료 처리
-          if (data.stage === 'done') {
-            console.log('🏁 SSE done 이벤트 수신, 결과 조회 시작');
-            disconnect();
-            // 결과 조회
-            ScanService.getScanResult(jobId).then((scanResult) => {
-              setIsComplete(true);
-              setResult(scanResult);
-              options?.onComplete?.(scanResult);
-            });
-          }
-        } catch (err) {
-          console.error('SSE 파싱 에러:', err);
+        // done 완료 → 결과 조회
+        if (data.stage === 'done' && data.status === 'completed') {
+          disconnect();
+          ScanService.getScanResult(jobId).then((scanResult) => {
+            setIsComplete(true);
+            setResult(scanResult);
+            options?.onComplete?.(scanResult);
+          });
         }
       };
 
-      // 개별 이벤트 리스너 (stage별 named events)
-      ['vision', 'rule', 'answer', 'reward', 'done'].forEach((stage) => {
+      // unnamed events
+      eventSource.onmessage = (event) => {
+        try {
+          handleEvent(JSON.parse(event.data) as ScanSSEEvent);
+        } catch (err) {
+          console.error('[Scan SSE] parse error:', err);
+        }
+      };
+
+      // named events (stage별)
+      (['queued', 'vision', 'rule', 'answer', 'reward', 'done'] as const).forEach((stage) => {
         eventSource.addEventListener(stage, (event: MessageEvent) => {
           try {
-            const data = JSON.parse(event.data) as ScanSSEEvent;
-            const step = STAGE_TO_STEP[data.stage] ?? 0;
-            console.log(`📨 SSE [${stage}] 이벤트: step=${step}, progress=${data.progress ?? '-'}%`, data);
-            // 역순 이벤트 방지: step은 항상 증가만
-            setCurrentStep((prev) => Math.max(prev, step));
-
-            if (data.stage === 'done') {
-              console.log('🏁 SSE done 이벤트 수신, 결과 조회 시작');
-              disconnect();
-              ScanService.getScanResult(jobId).then((scanResult) => {
-                setIsComplete(true);
-                setResult(scanResult);
-                options?.onComplete?.(scanResult);
-              });
-            }
+            handleEvent(JSON.parse(event.data) as ScanSSEEvent);
           } catch (err) {
-            console.error(`SSE ${stage} 이벤트 파싱 에러:`, err);
+            console.error(`[Scan SSE] ${stage} parse error:`, err);
           }
         });
       });

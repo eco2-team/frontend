@@ -7,6 +7,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ImageOff, Download, Loader2 } from 'lucide-react';
 
+/** iOS 여부 판별 */
+const isIOS = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 interface AgentImageProps {
   src?: string;
   alt?: string;
@@ -23,9 +28,13 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
   // Long press 감지
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPress = useRef(false);
+  const isClosingRef = useRef(false);
 
   // 모달 닫기 함수
   const closeModal = useCallback(() => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+
     setIsExpanded(false);
     setShowDownload(false);
     isLongPress.current = false;
@@ -33,6 +42,15 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
+
+    // pushState로 추가한 히스토리 엔트리 제거
+    if (window.history.state?.imageModal) {
+      window.history.back();
+    }
+
+    setTimeout(() => {
+      isClosingRef.current = false;
+    }, 0);
   }, []);
 
   // ESC 키, 뒤로가기 처리
@@ -92,6 +110,43 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
       return;
     }
   }, []);
+
+  // iOS PWA 호환 다운로드 핸들러
+  const handleDownload = useCallback(
+    async (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!src) return;
+
+      try {
+        if (isIOS() && navigator.share) {
+          // iOS: Web Share API 사용 (사진 앱 저장 가능)
+          const res = await fetch(src);
+          const blob = await res.blob();
+          const file = new File([blob], alt || 'image.png', { type: blob.type });
+          await navigator.share({ files: [file] });
+        } else {
+          // 기타: Blob 다운로드
+          const res = await fetch(src);
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = alt || 'image';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } catch {
+        // Fallback: 새 탭에서 열기
+        window.open(src, '_blank');
+      }
+
+      closeModal();
+    },
+    [src, alt, closeModal],
+  );
 
   if (!src) return null;
 
@@ -156,18 +211,14 @@ export const AgentImage = ({ src, alt }: AgentImageProps) => {
 
             {/* 다운로드 버튼 (길게 누르면 표시) */}
             {showDownload && (
-              <a
-                href={src}
-                download
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeModal();
-                }}
+              <button
+                type='button'
+                onClick={handleDownload}
                 className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 rounded-xl bg-white/90 px-6 py-4 text-gray-700 shadow-lg backdrop-blur-sm transition-all'
               >
                 <Download className='h-8 w-8' />
                 <span className='text-sm font-medium'>저장</span>
-              </a>
+              </button>
             )}
           </div>
         </div>
