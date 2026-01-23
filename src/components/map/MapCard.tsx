@@ -50,8 +50,17 @@ export const MapCard = ({
 
   const handleNavigation = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `https://map.kakao.com/link/to/${encodeURIComponent(location.name)},${location.latitude},${location.longitude}`;
-    window.open(url, '_blank');
+    const dest = `${encodeURIComponent(location.name)},${location.latitude},${location.longitude}`;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const url = `https://map.kakao.com/link/from/현위치,${pos.coords.latitude},${pos.coords.longitude}/to/${dest}`;
+        window.open(url, '_blank');
+      },
+      () => {
+        window.open(`https://map.kakao.com/link/to/${dest}`, '_blank');
+      },
+      { maximumAge: 60000, timeout: 3000 },
+    );
   };
 
   const handleClick = (e: React.MouseEvent) => {

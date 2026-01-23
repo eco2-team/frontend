@@ -31,8 +31,17 @@ export const MapDetailSheet = ({ centerId, onClose }: MapDetailSheetProps) => {
 
   const handleNavigation = () => {
     if (!detail?.latitude || !detail?.longitude) return;
-    const url = `https://map.kakao.com/link/to/${encodeURIComponent(detail.name)},${detail.latitude},${detail.longitude}`;
-    window.open(url, '_blank');
+    const dest = `${encodeURIComponent(detail.name)},${detail.latitude},${detail.longitude}`;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const url = `https://map.kakao.com/link/from/현위치,${pos.coords.latitude},${pos.coords.longitude}/to/${dest}`;
+        window.open(url, '_blank');
+      },
+      () => {
+        window.open(`https://map.kakao.com/link/to/${dest}`, '_blank');
+      },
+      { maximumAge: 60000, timeout: 3000 },
+    );
   };
 
   const handleCall = () => {
