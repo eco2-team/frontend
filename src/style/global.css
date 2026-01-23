@@ -103,7 +103,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 뷰포트 제한 */
+/* PWA 전용 뷰포트 제한 */
 #root {
   width: 100%;
   height: 100%;
@@ -116,19 +116,17 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-/* PWA standalone/fullscreen 모드: 디바이스 전체 화면 사용 */
-@media (display-mode: standalone), (display-mode: fullscreen) {
-  body {
-    align-items: stretch;
-  }
+/* PWA standalone 모드: 디바이스 전체 화면 사용 */
+html.pwa-standalone body {
+  align-items: stretch;
+}
 
-  #root {
-    height: 100dvh;
-    max-width: 100%;
-    max-height: none;
-    min-height: 100dvh;
-    box-shadow: none;
-  }
+html.pwa-standalone #root {
+  height: 100dvh;
+  max-width: 100%;
+  max-height: none;
+  min-height: 100dvh;
+  box-shadow: none;
 }
 
 /* 기본 html, body 초기화 + 화면 폭 제한 */
@@ -150,7 +148,7 @@ body {
   display: flex;
   place-items: center;
   min-width: 320px;
-  min-height: 100dvh;
+  min-height: 100vh;
 }
 
 /* 기본적으로 모든 요소에서 텍스트 선택 금지 */
