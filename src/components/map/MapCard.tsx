@@ -6,9 +6,10 @@ import CallIcon from '@/assets/icons/icon_call.svg';
 import RedTimeIcon from '@/assets/icons/icon_time_red.svg';
 import { WasteType, type WasteTypeKey } from '@/types/MapTypes';
 
-const ICONS = {
+const ICONS: Record<string, string> = {
   keco: SuperBinIcon,
   zerowaste: ZeroWasteIcon,
+  kakao: ZeroWasteIcon,
 };
 
 interface InfoItemProps {
@@ -35,15 +36,32 @@ interface MapCardProps {
   location: LocationListItemResponse;
   selectedLocationId: number | null;
   setSelectedLocationId: (id: number | null) => void;
+  onDetailOpen: (id: number) => void;
 }
 
 export const MapCard = ({
   location,
   selectedLocationId,
   setSelectedLocationId,
+  onDetailOpen,
 }: MapCardProps) => {
   const isSelected = selectedLocationId === location.id;
   const IconSrc = ICONS[location.source] ?? ZeroWasteIcon;
+
+  const handleNavigation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `https://map.kakao.com/link/to/${encodeURIComponent(location.name)},${location.latitude},${location.longitude}`;
+    window.open(url, '_blank');
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSelected && location.source !== 'kakao') {
+      onDetailOpen(location.id);
+    } else {
+      setSelectedLocationId(location.id);
+    }
+  };
 
   return (
     <div
@@ -53,10 +71,7 @@ export const MapCard = ({
           ? 'border-brand-primary bg-green-50 shadow-md'
           : 'hover:border-brand-primary border-gray-200'
       }`}
-      onClick={(e) => {
-        e.stopPropagation();
-        setSelectedLocationId(location.id);
-      }}
+      onClick={handleClick}
     >
       <div className='flex items-start gap-3'>
         <div className='flex items-center justify-center'>
@@ -84,34 +99,40 @@ export const MapCard = ({
               <span>
                 {location.pickup_categories
                   .map((item) => WasteType[item as WasteTypeKey])
-                  .join('∙')}
+                  .join('\u2219')}
               </span>
             </div>
           )}
 
-          {(location.source === 'keco' && location.is_holiday) ||
-            (location.phone && (
-              <div className='flex items-center gap-4 text-xs text-gray-500'>
-                {location.source === 'keco' && location.is_holiday && (
-                  <InfoItem
-                    icon={location.is_holiday ? RedTimeIcon : TimeIcon}
-                    text={
-                      location.is_holiday
-                        ? '오늘 휴무'
-                        : `${location.start_time} ~ ${location.end_time}`
-                    }
-                    alt='운영 시간'
-                    isRed={location.is_holiday}
-                  />
-                )}
-
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-4 text-xs text-gray-500'>
+              {location.source === 'keco' && location.is_holiday && (
                 <InfoItem
-                  icon={CallIcon}
-                  text={location.phone}
-                  alt='전화번호'
+                  icon={location.is_holiday ? RedTimeIcon : TimeIcon}
+                  text={
+                    location.is_holiday
+                      ? '오늘 휴무'
+                      : `${location.start_time} ~ ${location.end_time}`
+                  }
+                  alt='운영 시간'
+                  isRed={location.is_holiday}
                 />
-              </div>
-            ))}
+              )}
+              <InfoItem icon={CallIcon} text={location.phone} alt='전화번호' />
+            </div>
+
+            {/* 길찾기 버튼 */}
+            <button
+              onClick={handleNavigation}
+              className='flex items-center gap-1 rounded-full bg-brand-primary/10 px-2.5 py-1 text-[11px] font-medium text-brand-primary'
+            >
+              <svg className='h-3 w-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z' />
+                <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 11a3 3 0 11-6 0 3 3 0 016 0z' />
+              </svg>
+              길찾기
+            </button>
+          </div>
         </div>
       </div>
     </div>
