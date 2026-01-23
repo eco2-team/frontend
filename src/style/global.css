@@ -109,25 +109,15 @@
   height: 100%;
   max-width: var(--max-width-app);
   min-width: 320px;
-  max-height: 900px;
-  min-height: 500px;
   margin: 0 auto;
   background: #fff;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-/* PWA standalone/fullscreen 모드: 디바이스 전체 화면 사용 */
-@media (display-mode: standalone), (display-mode: fullscreen) {
-  body {
-    align-items: stretch;
-  }
-
+/* 데스크톱: 폰 목업 스타일 */
+@media (min-width: 481px) {
   #root {
-    height: 100dvh;
-    max-width: 100%;
-    max-height: none;
-    min-height: 100dvh;
-    box-shadow: none;
+    max-height: 900px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   }
 }
 
