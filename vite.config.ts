@@ -29,7 +29,7 @@ export default defineConfig({
         description: '폐기물 분리배출 AI 코칭 서비스 이코에코',
         theme_color: '#ffffff',
         background_color: '#ffffff',
-        display: 'fullscreen',
+        display: 'standalone',
         start_url: '/',
         scope: '/',
         icons: [
