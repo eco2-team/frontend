@@ -275,14 +275,14 @@ export const useAgentChat = (
     [onError],
   );
 
-  // SSE stale 시: 1회 재연결 시도 → 실패 시 polling fallback
+  // SSE stale 시: 1회 재연결 → 실패 시 polling fallback (최대 5분)
   const handleSSEStale = useCallback(
     (jobId: string) => {
       const chatId = pendingChatIdRef.current;
       if (!chatId) return;
 
-      // 최대 3회 SSE 재연결 시도 (gateway State catch-up 기대)
-      const MAX_SSE_RECONNECTS = 3;
+      // 1회 SSE 재연결 시도 (gateway State catch-up 기대)
+      const MAX_SSE_RECONNECTS = 1;
       if (sseReconnectAttemptRef.current < MAX_SSE_RECONNECTS) {
         sseReconnectAttemptRef.current += 1;
         console.log(`[SSE] Stale - reconnecting (attempt ${sseReconnectAttemptRef.current}/${MAX_SSE_RECONNECTS})`, { jobId });
@@ -347,13 +347,27 @@ export const useAgentChat = (
         }
       }, 3000);
 
-      // 최대 120초 후 폴링 중단
+      // 최대 300초(5분) 후 폴링 중단 + 에러 처리
       setTimeout(() => {
         if (pollingIntervalRef.current) {
           console.warn('[Polling] Max polling duration reached');
           stopPolling();
+          stopGenerationRef.current?.();
+
+          // 사용자에게 에러 피드백 제공
+          const timeoutError = new Error('응답 시간이 초과되었습니다. 다시 시도해주세요.');
+          if (pendingUserMessageIdRef.current) {
+            setMessages((prev) =>
+              updateMessageInList(prev, pendingUserMessageIdRef.current!, (msg) =>
+                updateMessageStatus(msg, 'failed'),
+              ),
+            );
+            pendingUserMessageIdRef.current = null;
+          }
+          pendingChatIdRef.current = null;
+          onError?.(timeoutError);
         }
-      }, 120000);
+      }, 300000);
     },
     [messages.length, userId, stopPolling],
   );
