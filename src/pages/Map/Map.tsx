@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from '@/components/Toast/toast';
-import type { ToggleType } from '@/api/services/map/map.type';
+import type { LocationListResponse, SuggestEntry, ToggleType } from '@/api/services/map/map.type';
 import { MapQueries } from '@/api/services/map/map.queries';
+import { MapService } from '@/api/services/map/map.service';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_ZOOM, MapView } from '@/components/map/MapView';
 import { MapFloatingView } from '@/components/map/MapFloatingView';
 import { MapBottomSheet } from '@/components/map/bottomSheet/MapBottomSheet';
+import { MapSearchBar } from '@/components/map/MapSearchBar';
+import { MapDetailSheet } from '@/components/map/MapDetailSheet';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import type { WasteTypeKey } from '@/types/MapTypes';
 import SpinnerIng from '@/assets/icons/spinner_ing.svg';
@@ -21,6 +24,7 @@ const Map = () => {
     useGeolocation();
 
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [shouldRefetch, setShouldRefetch] = useState(false);
   const [reSearch, setReSearch] = useState(false);
   const [radius, setRadius] = useState<number>();
@@ -29,6 +33,8 @@ const Map = () => {
   const [selectedFilter, setSelectedFilter] = useState<WasteTypeKey[]>(
     filter ? [filter] : [],
   );
+  const [selectedStoreCategories, setSelectedStoreCategories] = useState<string[]>([]);
+  const [searchResults, setSearchResults] = useState<LocationListResponse | undefined>(undefined);
 
   const { data, refetch } = useQuery({
     ...MapQueries.getLocations({
@@ -36,8 +42,11 @@ const Map = () => {
       lon: center.lng,
       zoom: 16 - mapZoom,
       radius,
+      store_category: selectedStoreCategories.length > 0
+        ? selectedStoreCategories.join(',')
+        : undefined,
     }),
-    enabled: false, // 자동 실행 방지
+    enabled: false,
   });
 
   // 위치 정보 로딩 완료 후 초기 데이터 로딩
@@ -54,8 +63,17 @@ const Map = () => {
     }
   }, [refetch, shouldRefetch]);
 
+  // store_category 변경 시 재검색
+  useEffect(() => {
+    if (!isLoading) {
+      refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStoreCategories]);
+
   const handleRefetchCenterLocation = () => {
     handleSetSelectedId(null);
+    setSearchResults(undefined);
     refetch();
   };
 
@@ -72,14 +90,13 @@ const Map = () => {
     setMapZoom(map.getLevel());
     setReSearch(true);
 
-    // 중심에서 화면 우상단까지의 거리로 radius 계산
     const bounds = map.getBounds();
-    const center = map.getCenter();
+    const mapCenter = map.getCenter();
     const ne = bounds.getNorthEast();
 
     const dist = calculateDistance(
-      center.getLat(),
-      center.getLng(),
+      mapCenter.getLat(),
+      mapCenter.getLng(),
       ne.getLat(),
       ne.getLng(),
     );
@@ -91,6 +108,7 @@ const Map = () => {
     if (!userLocation) return;
 
     setCenter(userLocation);
+    setSearchResults(undefined);
     setShouldRefetch(true);
 
     const moveLatLng = new kakao.maps.LatLng(
@@ -104,7 +122,8 @@ const Map = () => {
     setSelectedId(id);
     handleScrollToTop();
 
-    const targetLocation = data?.find((item) => item.id === id);
+    const displayData = searchResults || data;
+    const targetLocation = displayData?.find((item) => item.id === id);
     if (!id || !targetLocation) return;
 
     setSelectedId(id);
@@ -116,6 +135,14 @@ const Map = () => {
     kakaoMapRef.current?.panTo(moveLatLng);
   };
 
+  const handleDetailOpen = (id: number) => {
+    setDetailId(id);
+  };
+
+  const handleDetailClose = () => {
+    setDetailId(null);
+  };
+
   const handleScrollToTop = () => {
     const scrollContainer = document.getElementById(
       'bottom-sheet-scroll-container',
@@ -125,16 +152,52 @@ const Map = () => {
     }
   };
 
-  const handleSetToggle = (toggle: ToggleType) => {
-    setToggle(toggle);
+  const handleSetToggle = (newToggle: ToggleType) => {
+    setToggle(newToggle);
     handleScrollToTop();
   };
 
+  // 검색 실행
+  const handleSearch = async (query: string) => {
+    try {
+      const results = await MapService.searchLocations({ q: query, radius: 5000 });
+      setSearchResults(results);
+      setSelectedId(null);
+      setReSearch(false);
+
+      // 첫 번째 결과로 지도 이동
+      if (results.length > 0) {
+        const first = results[0];
+        const moveLatLng = new kakao.maps.LatLng(first.latitude, first.longitude);
+        kakaoMapRef.current?.panTo(moveLatLng);
+        setCenter({ lat: first.latitude, lng: first.longitude });
+      }
+    } catch {
+      toast.error('검색에 실패했습니다.');
+    }
+  };
+
+  // 자동완성 선택 시
+  const handleSuggestSelect = (entry: SuggestEntry) => {
+    const moveLatLng = new kakao.maps.LatLng(entry.latitude, entry.longitude);
+    kakaoMapRef.current?.panTo(moveLatLng);
+    setCenter({ lat: entry.latitude, lng: entry.longitude });
+    setSearchResults(undefined);
+    setShouldRefetch(true);
+    setReSearch(false);
+  };
+
+  const displayData = searchResults || data;
+
   const sortedData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+    if (!displayData || displayData.length === 0) return [];
 
     const filteredBySource =
-      toggle === 'all' ? data : data.filter((item) => item.source === toggle);
+      toggle === 'all'
+        ? displayData
+        : toggle === 'none'
+          ? []
+          : displayData.filter((item) => item.source === toggle);
 
     const filteredByCategories =
       selectedFilter.length > 0
@@ -150,16 +213,14 @@ const Map = () => {
       if (b.id === selectedId) return 1;
       return 0;
     });
-  }, [data, selectedFilter, selectedId, toggle]);
+  }, [displayData, selectedFilter, selectedId, toggle]);
 
-  // 위치 정보 로딩/에러 상태에 따른 토스트 메시지 (useEffect로 한 번만 표시)
   useEffect(() => {
     if (error) {
       toast.error(error);
     }
   }, [error]);
 
-  // 로딩 중 오버레이 컴포넌트
   const LoadingOverlay = () => (
     <div className='absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm'>
       <img
@@ -177,8 +238,12 @@ const Map = () => {
 
   return (
     <div className='relative h-full w-full overflow-y-hidden'>
-      {/* 로딩 중 오버레이 */}
       {isLoading && <LoadingOverlay />}
+
+      <MapSearchBar
+        onSearch={handleSearch}
+        onSuggestSelect={handleSuggestSelect}
+      />
 
       <MapView
         ref={kakaoMapRef}
@@ -205,6 +270,15 @@ const Map = () => {
         setSelectedId={handleSetSelectedId}
         selectedFilter={selectedFilter}
         setSelectedFilter={setSelectedFilter}
+        selectedStoreCategories={selectedStoreCategories}
+        setSelectedStoreCategories={setSelectedStoreCategories}
+        onDetailOpen={handleDetailOpen}
+      />
+
+      {/* 상세 시트 */}
+      <MapDetailSheet
+        centerId={detailId}
+        onClose={handleDetailClose}
       />
     </div>
   );
@@ -218,7 +292,7 @@ const calculateDistance = (
   lat2: number,
   lon2: number,
 ): number => {
-  const R = 6371000; // 지구 반지름 (m)
+  const R = 6371000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
 
   const dLat = toRad(lat2 - lat1);
