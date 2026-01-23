@@ -30,8 +30,13 @@ export type ScanSSEEvent = {
   job_id: string;
   stage: ScanSSEStage;
   status: 'started' | 'completed' | 'failed';
-  progress: number;
-  result?: ScanClassifyResponse;
+  seq: number;
+  ts: string;
+  progress?: number;
+  result?: Record<string, unknown>;
+  trace_id?: string;
+  span_id?: string;
+  traceparent?: string;
 };
 
 export type ScanClassificationResult = {
