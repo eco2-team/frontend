@@ -116,19 +116,6 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
 }
 
-/* PWA standalone 모드: 디바이스 전체 화면 사용 */
-html.pwa-standalone body {
-  align-items: stretch;
-}
-
-html.pwa-standalone #root {
-  height: 100dvh;
-  max-width: 100%;
-  max-height: none;
-  min-height: 100dvh;
-  box-shadow: none;
-}
-
 /* 기본 html, body 초기화 + 화면 폭 제한 */
 html,
 body {
