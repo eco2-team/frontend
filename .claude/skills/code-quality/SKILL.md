@@ -326,9 +326,50 @@ git commit -m "feat: 기능 추가"
 git push
 ```
 
-## 11. 예외 처리
+## 11. 필수 유의사항 (Critical Rules)
 
-### 11.1 레거시 코드
+### 11.1 CSS: #root 레이아웃 제한 절대 오버라이드 금지
+
+**배경**: `#root { max-width: var(--max-width-app) }` 는 데스크톱 웹에서 모바일 뷰(480px)를 유지하기 위한 핵심 제약입니다.
+
+**금지 사항**:
+```css
+/* ❌ 절대 금지: #root의 max-width를 조건부로 풀면 데스크톱에서 레이아웃이 깨짐 */
+html.pwa-standalone #root {
+  max-width: 100%;
+}
+
+/* ❌ 절대 금지: 미디어 쿼리로 max-width 오버라이드 */
+@media (display-mode: standalone) {
+  #root { max-width: 100%; }
+}
+```
+
+**허용 패턴** (다른 엔지니어가 작성한 원래 패턴):
+```css
+/* ✅ 항상 고정 max-width 유지 */
+#root {
+  max-width: var(--max-width-app); /* 480px */
+}
+```
+
+**사유**:
+- PWA standalone 모드에서만 전체 너비를 사용하려는 시도가 데스크톱 웹 뷰를 깨뜨림
+- `display-mode: standalone` 미디어 쿼리나 JS 기반 클래스 감지로 조건부 오버라이드하면 예상치 못한 환경에서 레이아웃이 풀림
+- 해결이 필요한 경우, #root의 max-width를 변경하지 말고 내부 컴포넌트 레벨에서 처리할 것
+
+### 11.2 CSS 수정 원칙: 다른 엔지니어 패턴 우선
+
+코드를 수정할 때 기존에 다른 엔지니어가 작성한 패턴을 우선적으로 따릅니다:
+- 새로운 CSS 패턴을 임의로 도입하지 않음
+- 기존 패턴과 충돌하는 오버라이드를 추가하지 않음
+- 변경이 필요하면 git blame으로 원래 작성자의 의도를 파악한 후 작업
+
+---
+
+## 12. 예외 처리
+
+### 12.1 레거시 코드
 
 **as any 사용 허용**:
 ```typescript
@@ -337,7 +378,7 @@ git push
 (msgStore as any).createIndex('legacy-index', 'old_field');
 ```
 
-### 11.2 외부 라이브러리
+### 12.2 외부 라이브러리
 
 **타입 선언 누락 시**:
 ```typescript
@@ -345,7 +386,7 @@ git push
 import UnknownLibrary from 'unknown-library';
 ```
 
-### 11.3 성능 최적화
+### 12.3 성능 최적화
 
 **의도적 any 사용**:
 ```typescript
@@ -356,7 +397,7 @@ const fastPath = (data: any) => {
 };
 ```
 
-## 12. 트러블슈팅
+## 13. 트러블슈팅
 
 빌드/린팅 문제 시:
 - `../troubleshooting/references/build-errors.md` 참조
