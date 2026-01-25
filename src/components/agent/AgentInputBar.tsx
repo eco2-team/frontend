@@ -117,7 +117,7 @@ export const AgentInputBar = ({
   };
 
   return (
-    <div className='max-w-app flex w-full flex-col gap-2 bg-white px-4 pt-3 pb-[max(8px,env(safe-area-inset-bottom,8px))] shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
+    <div className='max-w-app flex w-full flex-col gap-2 bg-white px-4 pt-3 pb-4 shadow-[0_-3px_25px_rgba(0,0,0,0.20)]'>
       {/* 숨겨진 갤러리 input */}
       <input
         ref={galleryInputRef}
