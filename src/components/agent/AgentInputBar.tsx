@@ -158,7 +158,7 @@ export const AgentInputBar = ({
           {/* 모델 선택 버튼 */}
           <button
             onClick={() => setModelDropdownOpen(!modelDropdownOpen)}
-            className='ml-3 flex w-[100px] items-center justify-center gap-0.5 self-end rounded-md px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100'
+            className='ml-6 flex items-center gap-0.5 self-end rounded-md px-1.5 py-0.5 text-[10px] text-gray-500 transition-colors hover:bg-gray-100'
           >
             {selectedModel.label}
             <ChevronUp
