@@ -356,10 +356,30 @@ export const useAgentSSE = (
       es.addEventListener('error', (e) => {
         const messageEvent = e as MessageEvent;
 
-        // 서버가 보낸 에러 이벤트 (fatal)
+        // 서버가 보낸 에러 이벤트
         if (messageEvent.data) {
           try {
             const data = JSON.parse(messageEvent.data);
+
+            // Retriable 에러: timeout은 재연결 허용 (Last-Event-ID로 토큰 복구)
+            const retriableErrors = ['timeout', 'connection_reset', 'temporary'];
+            if (retriableErrors.includes(data.error)) {
+              console.warn('[SSE] Retriable error, will auto-reconnect:', data.error);
+              consecutiveErrorsRef.current += 1;
+              // EventSource가 자동 재연결하도록 return (cleanup 안함)
+              if (consecutiveErrorsRef.current >= MAX_CONSECUTIVE_ERRORS) {
+                console.error('[SSE] Too many retriable errors, giving up');
+                const err = new Error(data.message || 'SSE 재연결 실패');
+                setError(err);
+                onErrorRef.current?.(err);
+                cleanup();
+                setIsStreaming(false);
+                setCurrentStage(null);
+              }
+              return;
+            }
+
+            // Fatal 에러: 재연결 불가
             const err = new Error(data.message || 'SSE error');
             setError(err);
             onErrorRef.current?.(err);
